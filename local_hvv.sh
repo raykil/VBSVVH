@@ -23,10 +23,10 @@ normalize_year() {
 rm -r local_hvv/
 mkdir local_hvv/
 
-tag="hvv_26May6"
-process_tag="merged_2lep_1FJ_r3_2lep_1FJ_20260430155132"
-basedir="/eos/user/r/rband/HVV2LRDF/2lep_1FJ_r3_2lep_1FJ/"
-indir="${basedir}/merged_2lep_1FJ_r3_2lep_1FJ_20260430155132_2lep_1FJ/"
+tag="hvv_26June6"
+process_tag="merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ"
+basedir="/eos/user/r/rband/HVV2LRDF/merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ"
+indir="${basedir}"
 
 #signal
 # process_tag="merged_2lep_1FJ_r3_2lep_1FJ_20260504235849"
@@ -41,17 +41,22 @@ indir="${basedir}/merged_2lep_1FJ_r3_2lep_1FJ_20260430155132_2lep_1FJ/"
 # process_tag="merged_2lep_1FJ_r2_2lep_1FJ_20260430154928"
 # basedir="/eos/user/r/rband/HVV2LRDF/2lep_1FJ_r2_2lep_1FJ/"
 # indir="${basedir}/merged_2lep_1FJ_r2_2lep_1FJ_20260430154928_2lep_1FJ/"
-outdir="/store/group/lpchbbrun3/lzygala/${tag}/${process_tag}"
-
-xrdcp "root://eosuser.cern.ch///${basedir}/${process_tag}.json" .
+outdir="/store/user/rband/${tag}/${process_tag}"
+#xrdcp "root://eosuser.cern.ch///${basedir}/${process_tag}.json" .
+xrdcp "root://eosuser.cern.ch///${basedir}/merged_2lep_1FJ_r2_2lep_1FJ_20260615211230.json" .
 
 count=0
-for process in $(jq -r '.samples | keys[]' "${process_tag}.json")
+#for process in $(jq -r '.samples | keys[]' "${process_tag}.json")
+for process in $(jq -r '.samples | keys[]' "merged_2lep_1FJ_r2_2lep_1FJ_20260615211230.json")
 do
-    echo "Processing sample: $process"
-    year_raw=$(jq -r --arg proc "$process" '.samples[$proc].metadata.year' "${process_tag}.json")
+
+    year_raw=$(jq -r --arg proc "$process" '.samples[$proc].metadata.year' "merged_2lep_1FJ_r2_2lep_1FJ_20260615211230.json")
     year=$(normalize_year "$year_raw")
-    echo "Using year: $year"
+    if [[ "$year" == "2018" ]]; then
+	continue
+    fi
+    echo "Processing sample: $process"
+#    echo "Using year: $year"
     ((count++))
     # if [[ $count -ge 2 ]]; then
     #     echo "Stopping after 2 samples (test mode)"
@@ -106,7 +111,7 @@ do
             final_filename="part${jobnum}.parquet"
 
             # Copy the file to its final, nested destination with the new name
-            echo "root://cmseos.fnal.gov///${outdir}/${year}/${process}/parquet/${jer_name}/${region_name}/${final_filename}"
+#            echo "root://cmseos.fnal.gov///${outdir}/${year}/${process}/parquet/${jer_name}/${region_name}/${final_filename}"
             xrdcp -f "$file" "root://cmseos.fnal.gov///${outdir}/${year}/${process}/parquet/${jer_name}/${region_name}/${final_filename}"
         done
 

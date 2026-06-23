@@ -109,9 +109,9 @@ def main(args):
     year = args.year
     region = args.region
 
-    MAIN_DIR = "/eos/uscms/store/group/lpchbbrun3/"
-    dir_name = "lzygala/hvv_26May11/merged_2lep_1FJ_r3_2lep_1FJ_20260506174059/"
-    # dir_name = "lzygala/hvv_26May11/merged_2lep_1FJ_r2_2lep_1FJ_20260506173848/"
+    MAIN_DIR = "/eos/uscms/store/user/rband/"
+    dir_name = "hvv_26June6/merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ"
+
     path_to_dir = f"{MAIN_DIR}/{dir_name}/"
 
     load_columns = [
@@ -121,7 +121,11 @@ def main(args):
         "HiggsAK8_ParTPXbbVsQCD",
         'weight_noxsec',
         'LeadingLep_flavor',
-        'SubLeadingLep_flavor'
+        'SubLeadingLep_flavor',
+        'VBFPair_mjj',
+        'VBFPair_deta',
+        'VBFPair_score',
+        'ABCD_score'
     ]
     for axis in axis_to_column.keys():
         column = axis_to_column[axis]

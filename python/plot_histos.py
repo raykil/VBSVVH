@@ -83,7 +83,7 @@ def plot_by_process(hists, category, year_str, outdir, region, style):
         bkg_order = ["zjets", "wjets", "other", "top"]
         signals = ["hbb"]
 
-        legend_title = f"{category.capitalize()} Region, {pt_low:g} < $p_T$ < {pt_high:g} GeV"
+        legend_title = f", {pt_low:g} < $p_T$ < {pt_high:g} GeV"
 
         fig, (ax, rax) = ratio_plot(
             histograms_to_plot,
@@ -133,9 +133,9 @@ def plot_c2vsignal(hists, category, year_str, outdir, region, style):
         # These names must have a corresponding entry in the style file with a 'contains' key
         bkg_order = ["zjets", "wjets", "other","qcd","top","higgs"]
         # signals = ["higgs", "vbs-hvv-c2v1p5", "vbs-hvv-c2v2p0", "vbs-hvv-c2v1p0"]
-        signals = ["vbs-hvv-c2v-1p0-c3-1p0", "vbs-hvv-c2v-1p0-c3-10p0", "vbs-hvv-c2v-1p5-c3-1p0"]
-
-        legend_title = f"{category.capitalize()} Region"
+#        signals = ["vbs-hvv-c2v-1p0-c3-1p0", "vbs-hvv-c2v-1p0-c3-10p0", "vbs-hvv-c2v-1p5-c3-1p0"]
+        signals = ["vbs-hvv-c2v-1p5-c3-1p0"]
+        legend_title = f""
 
         fig, (ax, rax) = ratio_plot(
             histograms_to_plot,
@@ -357,7 +357,7 @@ def main(args):
     output_dir = Path(args.outdir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    style_path = Path("style_hbb.yaml")
+    style_path = Path("python/style_hbb.yaml")
     with style_path.open() as f:
         style = yaml.safe_load(f)
 

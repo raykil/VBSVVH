@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import torch
 from pathlib import Path
 
 import awkward as ak
@@ -12,6 +13,7 @@ import xgboost as xgb
 from coffea.analysis_tools import PackedSelection, Weights
 from coffea.ml_tools import xgboost_wrapper
 from hist.dask import Hist
+from sklearn.preprocessing import MinMaxScaler
 
 from hbb.corrections import (
     mupt_variations,
@@ -38,7 +40,7 @@ from .objects import (
     set_ak8jets,
     tight_photons,
 )
-
+from .abcd_model import *
 logger = logging.getLogger(__name__)
 
 
@@ -57,7 +59,7 @@ gen_selection_dict = {
     "Zto2Q-": gen_selection_V,
     "ZGto2QG-": gen_selection_Vg,
 }
-
+_abcd_model_cache = {}
 def get_BDT_model(BDT_file: str):
     bdt_features = [
         "nFatJet",
@@ -133,6 +135,83 @@ def get_BDT_model(BDT_file: str):
     model = xgboost_model(booster)
     return model
 
+def _safe_minmax_scale(values):
+    scaled = np.zeros_like(values, dtype=np.float64)
+    scaler = MinMaxScaler()
+    scaled = scaler.fit_transform(values.reshape(-1, 1)).ravel()
+    return scaled
+
+def eval_ABCD_model(events, saved_model="best_model.pt"):
+    if saved_model not in _abcd_model_cache:
+        model = ABCDModel(
+            input_size=16,
+            hidden_layers=[64, 32, 16],
+            learning_rate=0.001,
+            bce_weight=1.0,
+            disco_lambda=10.0,
+            flavor='single',
+            use_batchnorm=True,
+            dropout=0.2,
+            weight_decay=0.01,
+            label_smoothing=0.0,
+            use_lr_scheduler=True,
+            lr_scheduler_patience=5,
+            lr_scheduler_factor=0.5,
+            lr_scheduler_min_lr=1e-6,
+        )
+        state_dict = torch.load(saved_model, map_location="cpu")
+        model.load_state_dict(state_dict)
+        model.eval()
+        _abcd_model_cache[saved_model] = model
+    model = _abcd_model_cache[saved_model]
+
+    feature_transforms = {"lepton_pt_1":"log","lepton_eta_1":"minmax","lepton_phi_1":"minmax","lepton_mass_1":"log",
+                          "lepton_pt_2":"log","lepton_eta_2":"minmax","lepton_phi_2":"minmax","lepton_mass_2":"log",
+                          "met_phi":"minmax","met_pt":"log",
+                          "fatjet_pt":"log","fatjet_eta":"minmax","fatjet_phi":"minmax","fatjet_mass":"log",
+                          "fatjet_tau2":"none","fatjet_tau1":"none"}
+    feature_map = {
+        "lepton_pt_1":events.lepton.pt,"lepton_eta_1":events.lepton.eta,"lepton_phi_1":events.lepton.phi,"lepton_mass_1":events.lepton.mass,
+        "lepton_pt_2":events.lepton.pt,"lepton_eta_2":events.lepton.eta,"lepton_phi_2":events.lepton.phi,"lepton_mass_2":events.lepton.mass,
+        "met_phi":events.met.phi,"met_pt":events.met.pt,
+        "fatjet_pt":events.fatjet.pt,"fatjet_eta":events.fatjet.eta,"fatjet_phi":events.fatjet.phi,"fatjet_mass":events.fatjet.mass,
+        "fatjet_tau2":events.fatjet.tau2, "fatjet_tau1":events.fatjet.tau1,
+        }
+    if ak.backend(events.met.pt) == "typetracer":
+        for arr in feature_map.values():
+            arr.layout._touch_data(recursive=True)
+        return ak.zeros_like(events.met.pt)  # correct shape/dtype, no real data
+
+    features = list(feature_map.keys())
+    columns = []
+    for feature in features:
+        if feature.endswith("_1"):
+            x = ak.to_numpy(ak.fill_none(ak.pad_none(feature_map[feature], 1, clip=True)[:, 0], 0)).astype(np.float32)
+        elif feature.endswith("_2"):
+            x = ak.to_numpy(ak.fill_none(ak.pad_none(feature_map[feature], 2, clip=True)[:, 1], 0)).astype(np.float32)
+        else:
+            x = ak.to_numpy(feature_map[feature]).astype(np.float32)
+        transform = feature_transforms[feature]
+        if transform == "log":
+            x = np.log1p(x)
+            x = _safe_minmax_scale(x)
+        elif transform == "minmax":
+            x = _safe_minmax_scale(x)
+        elif transform == "none":
+            x = _safe_minmax_scale(x)
+            pass
+        columns.append(x)
+    X = np.column_stack(columns).astype(np.float32)
+    with torch.no_grad():
+        x_tensor = torch.from_numpy(X)
+        logits = model(x_tensor)
+        scores = torch.sigmoid(logits).detach().cpu().numpy().flatten()
+#    scores = dak.from_awkward(ak.Array(scores), npartitions)
+#    print(scores)
+    return scores
+def add_abcd_score(events):
+    score = eval_ABCD_model(events)
+    return ak.with_field(events, ak.Array(score), "ABCD_score")
 
 class categorizer(SkimmerABC):
     def __init__(
@@ -166,7 +245,7 @@ class categorizer(SkimmerABC):
         self._mupt_type = "pt" #"ptcorr"
         if self._evaluate_BDT:
             self.bdt_model = get_BDT_model("src/hbb/data/MultiClassBDT_23Oct25.ubj")
-
+        
         with Path("src/hbb/dilep_triggers.json").open() as f:
             self._triggers = json.load(f)
 
@@ -198,6 +277,12 @@ class categorizer(SkimmerABC):
     def process(self, events):
 
         # process only nominal case
+        meta = ak.with_field(
+            events._meta,
+            np.array([], dtype=np.float32),
+            "ABCD_score"
+        )
+        events = dak.map_partitions(add_abcd_score, events, meta=meta)
         if self._skip_syst or not self._save_skim or not hasattr(events, "genWeight"):
             return {"nominal": self.process_shift(events, "nominal")}
 
@@ -446,9 +531,12 @@ class categorizer(SkimmerABC):
         jet2_away = ak.firsts(ak4_outside_objs[:, 1:2])
 
 
-        vbf_deta = abs(jet1_away.eta - jet2_away.eta)
-        vbf_mjj = (jet1_away + jet2_away).mass
-
+        #vbf_deta = abs(jet1_away.eta - jet2_away.eta)
+        #vbf_mjj = (jet1_away + jet2_away).mass
+        vbf_deta = events.vbs.detajj
+        vbf_mjj = events.vbs.mjj
+        vbf_score = events.vbs.score
+        abcd_score = events.ABCD_score
         isvbf = (vbf_deta > 2.5) & (vbf_mjj > 750)
         isvbf = ak.fill_none(isvbf, False)
 
@@ -456,7 +544,6 @@ class categorizer(SkimmerABC):
 
         selection.add("2ak4s", nak4s_vbf > 1)
         selection.add("isvbf", isvbf)
-
         gen_variables = {}
         btag_SF = ak.ones_like(events.run)
 
@@ -597,6 +684,8 @@ class categorizer(SkimmerABC):
                 "VAK8_pnetXbbXcc": candidateVjet.pnetXbbXcc,
                 "VBFPair_mjj": vbf_mjj,
                 "VBFPair_deta": vbf_deta,
+                "VBFPair_score": vbf_score,
+                "ABCD_score": abcd_score,
                 "MET": met.pt,
                 "LepPair_mass": ak.fill_none(lep_mass, -999.),
                 "LeadingLep_pt": leadinglep.pt,
