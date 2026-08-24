@@ -374,7 +374,7 @@ def main(args):
         print(f"Plotting QCD pass/fail shapes for year: {year_str}...")
         plot_qcd_shapes(histograms, year_str, args.outdir, args.region, args.norm_type)
     elif args.plot_type == "c2vsignal":
-        for category in ["preselection", "preselection_ee", "preselection_mumu", "preselection_emu", "signal_region"]:
+        for category in ["preselection", "preselection_ee", "preselection_mumu", "preselection_emu", "signal_region", "signal_region_ee", "signal_region_mumu", "signal_region_emu"]:
             print(f"Plotting C2V signal shapes for category: {category}, year: {year_str}...")
             plot_c2vsignal(histograms, category, year_str, args.outdir, args.region, style)
 

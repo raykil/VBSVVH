@@ -67,10 +67,14 @@ def fill_ptbinned_histogram(events, axis_label, region, dataset, isData=False, d
 
         selection_dict = {
             "preselection": ["preselection"],
+            "preselection_hbb":["preselection", "hbb_score_0p1"],
             "preselection_ee": ["preselection", "both_electrons"],
             "preselection_mumu": ["preselection", "both_muons"],
             "preselection_emu": ["preselection", "opposite_flavor"],
-            "signal_region": ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250"]
+            "signal_region": ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250"],
+            "signal_region_ee": ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250", "both_electrons"],
+            "signal_region_mumu": ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250", "both_muons"],
+            "signal_region_emu": ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250", "opposite_flavor"]
         }
 
         # Fill histograms
@@ -108,11 +112,16 @@ def fill_ptbinned_histogram(events, axis_label, region, dataset, isData=False, d
 def main(args):
     year = args.year
     region = args.region
-
+    rnfj = args.rnfj
     MAIN_DIR = "/eos/uscms/store/user/rband/"
-    dir_name = "hvv_26June6/merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ"
+    date = "hvv_26Aug19"
+    paths = {"r21FJ":"merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ",
+            "r22FJ":"merged_2lep_2FJ_r2_2lep_2FJ_20260615211710_2lep_2FJ",
+            "r31FJ":"merged_2lep_1FJ_r3_2lep_1FJ_20260615211529_2lep_1FJ",
+            "r32FJ":"merged_2lep_2FJ_r3_2lep_2FJ_20260615211951_2lep_2FJ"
+            }
 
-    path_to_dir = f"{MAIN_DIR}/{dir_name}/"
+    path_to_dir = f"{MAIN_DIR}/{date}/{paths[rnfj]}/"
 
     load_columns = [
         "weight",
@@ -122,6 +131,7 @@ def main(args):
         'weight_noxsec',
         'LeadingLep_flavor',
         'SubLeadingLep_flavor',
+        'LepPair_mass',
         'VBFPair_mjj',
         'VBFPair_deta',
         'VBFPair_score',
@@ -230,6 +240,13 @@ if __name__ == "__main__":
             "signal-zzh-1FJ",
             "signal-wzh-zzh-2FJ"
         ],
+    )
+    parser.add_argument(
+        "--rnfj",
+        help="Run and FJ configuration",
+        type=str,
+        required=True,
+        choices=["r21FJ", "r22FJ", "r31FJ", "r32FJ"],
     )
     parser.add_argument(
         "--outdir", help="Output directory to save histograms.", type=str, default="histograms"
