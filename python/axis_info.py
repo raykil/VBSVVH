@@ -14,6 +14,8 @@ axis_to_column = {
     "pt4": "SubLeadingLep_pt",
     "lepmass": "LepPair_mass",
     "lepmass2": "LepPair_mass",
+    "vbs_score": "VBFPair_score",
+    "abcd_score": "ABCD_score"
 
 }
 
@@ -33,4 +35,6 @@ axis_to_histaxis = {
     "met": hist.axis.Regular(25, 0, 1000, name="met", label=r"Puppi MET [GeV]"),
     "lepmass": hist.axis.Regular(25, 0, 1000, name="lepmass", label="$m_{ll}$ [GeV]"),
     "lepmass2": hist.axis.Regular(25, 80, 100, name="lepmass2", label="$m_{ll}$ [GeV]"),
+    "vbs_score": hist.axis.Regular(25, 0, 1, name="vbs_score", label="VBS BDT Score"),
+    "abcd_score": hist.axis.Regular(25, 0, 1, name="abcd_score", label="ABCDnet Score")
 }

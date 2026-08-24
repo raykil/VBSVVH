@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import torch
 from pathlib import Path
 
 import awkward as ak
@@ -12,6 +13,7 @@ import xgboost as xgb
 from coffea.analysis_tools import PackedSelection, Weights
 from coffea.ml_tools import xgboost_wrapper
 from hist.dask import Hist
+from sklearn.preprocessing import MinMaxScaler
 
 from hbb.corrections import (
     mupt_variations,
@@ -38,7 +40,7 @@ from .objects import (
     set_ak8jets,
     tight_photons,
 )
-
+from .abcd_model import *
 logger = logging.getLogger(__name__)
 
 
@@ -57,7 +59,7 @@ gen_selection_dict = {
     "Zto2Q-": gen_selection_V,
     "ZGto2QG-": gen_selection_Vg,
 }
-
+_abcd_model_cache = {}
 def get_BDT_model(BDT_file: str):
     bdt_features = [
         "nFatJet",
@@ -133,6 +135,153 @@ def get_BDT_model(BDT_file: str):
     model = xgboost_model(booster)
     return model
 
+def _safe_minmax_scale(values):
+    scaled = np.zeros_like(values, dtype=np.float64)
+    scaler = MinMaxScaler()
+    scaled = scaler.fit_transform(values.reshape(-1, 1)).ravel()
+    return scaled
+
+def eval_ABCD_model(events, nFJ=1, saved_model="best_model.pt"):
+    if saved_model not in _abcd_model_cache:
+        if nFJ == 1:
+            model = ABCDModel(
+                input_size=16,
+                hidden_layers=[64, 32, 16],
+                learning_rate=0.001,
+                bce_weight=1.0,
+                disco_lambda=10.0,
+                flavor='single',
+                use_batchnorm=True,
+                dropout=0.2,
+                weight_decay=0.01,
+                label_smoothing=0.0,
+                use_lr_scheduler=True,
+                lr_scheduler_patience=5,
+                lr_scheduler_factor=0.5,
+                lr_scheduler_min_lr=1e-6,
+            )
+        else:   
+            model = ABCDModel(
+                input_size=25,
+                hidden_layers=[64, 32, 16],
+                learning_rate=0.001,
+                bce_weight=1.0,
+                disco_lambda=10.0,
+                flavor='single',
+                use_batchnorm=True,
+                dropout=0.2,
+                weight_decay=0.01,
+                label_smoothing=0.0,
+                use_lr_scheduler=True,
+                lr_scheduler_patience=5,
+                lr_scheduler_factor=0.5,
+                lr_scheduler_min_lr=1e-6,
+            )
+        state_dict = torch.load(saved_model, map_location="cpu")
+        model.load_state_dict(state_dict)
+        model.eval()
+        _abcd_model_cache[saved_model] = model
+    model = _abcd_model_cache[saved_model]
+    if nFJ == 1:
+        feature_transforms = {"lepton_pt_1":"log","lepton_pt_2":"log",
+                        "lepton_eta_1":"minmax","lepton_eta_2":"minmax",
+                        "lepton_phi_1":"minmax","lepton_phi_2":"minmax",
+                        "lepton_mass_1":"log","lepton_mass_2":"log",
+                        "met_phi":"minmax","met_pt":"log",
+                        "fatjet_pt":"log","fatjet_eta":"minmax","fatjet_phi":"minmax","fatjet_mass":"log",
+                        "fatjet_tau2":"none","fatjet_tau1":"none"}
+    elif nFJ == 2:
+        feature_transforms = {"lepton_pt_1":"log","lepton_pt_2":"log",
+                        "lepton_eta_1":"minmax","lepton_eta_2":"minmax",
+                        "lepton_phi_1":"minmax","lepton_phi_2":"minmax",
+                        "lepton_mass_1":"log","lepton_mass_2":"log",
+                        "met_phi":"minmax","met_pt":"log",
+                        "fatjet_pt_1":"log","fatjet_pt_2":"log",
+                        "fatjet_eta_1":"minmax","fatjet_eta_2":"minmax",
+                        "fatjet_phi_1":"minmax","fatjet_phi_2":"minmax",
+                        "fatjet_mass_1":"log", "fatjet_mass_2":"log",
+                        "fatjet_msoftdrop_1":"log", "fatjet_msoftdrop_2":"log",
+                        "fatjet_tau2_1":"none","fatjet_tau1_1":"none",
+                        "fatjet_tau2_2":"none","fatjet_tau1_2":"none",
+                        "ht_fatjets":"log"}
+    else:
+        raise ValueError(f"Invalid nFJ value: {nFJ}. Must be 1 or 2.")
+    feature_map = {
+        "lepton_pt_1":events.lepton.pt,"lepton_eta_1":events.lepton.eta,"lepton_phi_1":events.lepton.phi,"lepton_mass_1":events.lepton.mass,
+        "lepton_pt_2":events.lepton.pt,"lepton_eta_2":events.lepton.eta,"lepton_phi_2":events.lepton.phi,"lepton_mass_2":events.lepton.mass,
+        "met_phi":events.met.phi,"met_pt":events.met.pt,
+        "fatjet_pt":events.fatjet.pt,"fatjet_eta":events.fatjet.eta,"fatjet_phi":events.fatjet.phi,"fatjet_mass":events.fatjet.mass,
+        "fatjet_tau2":events.fatjet.tau2, "fatjet_tau1":events.fatjet.tau1,
+        "fatjet_pt_1":events.fatjet.pt,"fatjet_eta_1":events.fatjet.eta,"fatjet_phi_1":events.fatjet.phi,"fatjet_mass_1":events.fatjet.mass,
+        "fatjet_pt_2":events.fatjet.pt,"fatjet_eta_2":events.fatjet.eta,"fatjet_phi_2":events.fatjet.phi,"fatjet_mass_2":events.fatjet.mass,
+        "fatjet_tau2_1":events.fatjet.tau2,"fatjet_tau1_1":events.fatjet.tau1,
+        "fatjet_tau2_2":events.fatjet.tau2,"fatjet_tau1_2":events.fatjet.tau1,
+        "fatjet_msoftdrop_1":events.fatjet.msoftdrop,"fatjet_msoftdrop_2":events.fatjet.msoftdrop,
+        "ht_fatjets":events.ht.fatjets
+        }
+    if ak.backend(events.met.pt) == "typetracer":
+        for arr in feature_map.values():
+            arr.layout._touch_data(recursive=True)
+        return ak.zeros_like(events.met.pt)  # correct shape/dtype, no real data
+
+    features = list(feature_transforms.keys())
+    columns = []
+    for feature in features:
+        if feature.endswith("_1"):
+            x = ak.to_numpy(ak.fill_none(ak.pad_none(feature_map[feature], 1, clip=True)[:, 0], 0)).astype(np.float32)
+        elif feature.endswith("_2"):
+            x = ak.to_numpy(ak.fill_none(ak.pad_none(feature_map[feature], 2, clip=True)[:, 1], 0)).astype(np.float32)
+        else:
+            x = ak.to_numpy(feature_map[feature]).astype(np.float32)
+        transform = feature_transforms[feature]
+        if transform == "log":
+            x = np.log1p(x)
+            x = _safe_minmax_scale(x)
+        elif transform == "minmax":
+            x = _safe_minmax_scale(x)
+        elif transform == "none":
+            x = _safe_minmax_scale(x)
+            pass
+        columns.append(x)
+    X = np.column_stack(columns).astype(np.float32)
+    with torch.no_grad():
+        x_tensor = torch.from_numpy(X)
+        logits = model(x_tensor)
+        scores = torch.sigmoid(logits).detach().cpu().numpy().flatten()
+#    scores = dak.from_awkward(ak.Array(scores), npartitions)
+#    print(scores)
+    return scores
+def add_abcd_score(events, nFJ=1, saved_model="best_model.pt"):
+    score = eval_ABCD_model(events, nFJ, saved_model)
+    return ak.with_field(events, ak.Array(score), "ABCD_score")
+model_file = {}
+model_file["2022"] = {}
+model_file["2023"] = {}
+model_file["2024"] = {}
+model_file["2025"] = {}
+model_file["2016APV"] = {}
+model_file["2016"] = {}
+model_file["2017"] = {}
+model_file["2018"] = {}
+
+
+model_file["2022"]["1"] = "src/hbb/data/run3_2L_1FJ_best_model.pt"
+model_file["2022"]["2"] = "src/hbb/data/run3_2L_2FJ_best_model.pt"
+model_file["2023"]["1"] = "src/hbb/data/run3_2L_1FJ_best_model.pt"
+model_file["2023"]["2"] = "src/hbb/data/run3_2L_2FJ_best_model.pt"
+model_file["2024"]["1"] = "src/hbb/data/run3_2L_1FJ_best_model.pt"
+model_file["2024"]["2"] = "src/hbb/data/run3_2L_2FJ_best_model.pt"
+model_file["2025"]["1"] = "src/hbb/data/run3_2L_1FJ_best_model.pt"
+model_file["2025"]["2"] = "src/hbb/data/run3_2L_2FJ_best_model.pt"
+
+model_file["2016APV"]["1"] = "src/hbb/data/run2_2L_1FJ_best_model.pt"
+model_file["2016APV"]["2"] = "src/hbb/data/run2_2L_2FJ_best_model.pt"
+model_file["2016"]["1"] = "src/hbb/data/run2_2L_1FJ_best_model.pt"
+model_file["2016"]["2"] = "src/hbb/data/run2_2L_2FJ_best_model.pt"
+model_file["2017"]["1"] = "src/hbb/data/run2_2L_1FJ_best_model.pt"
+model_file["2017"]["2"] = "src/hbb/data/run2_2L_2FJ_best_model.pt"
+model_file["2018"]["1"] = "src/hbb/data/run2_2L_1FJ_best_model.pt"
+model_file["2018"]["2"] = "src/hbb/data/run2_2L_2FJ_best_model.pt"
 
 class categorizer(SkimmerABC):
     def __init__(
@@ -146,6 +295,7 @@ class categorizer(SkimmerABC):
         evaluate_BDT=True,
         btag_eff=False,
         save_skim_nosysts=False,
+        nFJ=1,
         dataset=""
     ):
         super().__init__()
@@ -164,9 +314,10 @@ class categorizer(SkimmerABC):
         self._evaluate_BDT = evaluate_BDT
         self._btag_eff = btag_eff
         self._mupt_type = "pt" #"ptcorr"
+        self._nFJ = nFJ
         if self._evaluate_BDT:
             self.bdt_model = get_BDT_model("src/hbb/data/MultiClassBDT_23Oct25.ubj")
-
+        
         with Path("src/hbb/dilep_triggers.json").open() as f:
             self._triggers = json.load(f)
 
@@ -198,6 +349,12 @@ class categorizer(SkimmerABC):
     def process(self, events):
 
         # process only nominal case
+        meta = ak.with_field(
+            events._meta,
+            np.array([], dtype=np.float32),
+            "ABCD_score"
+        )
+        events = dak.map_partitions(add_abcd_score, events, self._nFJ, model_file[self._year][str(self._nFJ)], meta=meta)
         if self._skip_syst or not self._save_skim or not hasattr(events, "genWeight"):
             return {"nominal": self.process_shift(events, "nominal")}
 
@@ -400,7 +557,7 @@ class categorizer(SkimmerABC):
             xbbfatjets = ak8_outside_leps[ak.argsort(ak8_outside_leps.ParTPXbbVsQCD, axis=1, ascending=False)]
 
         candidatejet = ak.firsts(xbbfatjets)
-
+        Hscore = candidatejet.globalParT3_Xbb / (candidatejet.globalParT3_Xbb + candidatejet.globalParT3_QCD)
         # ---- 2ND AK8 ----
         dR_candHiggs = candfatjets.delta_r(candidatejet)
         ak8_outside_objs = candfatjets[(dR_leadlep > 0.8) & (dR_subleadlep > 0.8) & (dR_candHiggs > 0.8)] 
@@ -410,6 +567,8 @@ class categorizer(SkimmerABC):
 
         selection.add("onegoodAK8", (ak.num(ak8_outside_leps) == 1))
         selection.add("twogoodAK8", (ak.num(ak8_outside_leps) == 2))
+        VZscore = (candidateVjet.globalParT3_Xbb + candidateVjet.globalParT3_Xcc + candidateVjet.globalParT3_Xqq) / (candidateVjet.globalParT3_Xbb + candidateVjet.globalParT3_Xcc + candidateVjet.globalParT3_Xqq + candidateVjet.globalParT3_QCD)
+        VWscore = (candidateVjet.globalParT3_Xcs + (1/3)*candidateVjet.globalParT3_Xqq) / (candidateVjet.globalParT3_Xcs + (1/3)*candidateVjet.globalParT3_Xqq + candidateVjet.globalParT3_QCD)
 
         # ---- AK4 Jets ----
         goodjets = good_ak4jets(jets)
@@ -446,9 +605,13 @@ class categorizer(SkimmerABC):
         jet2_away = ak.firsts(ak4_outside_objs[:, 1:2])
 
 
-        vbf_deta = abs(jet1_away.eta - jet2_away.eta)
-        vbf_mjj = (jet1_away + jet2_away).mass
-
+        #vbf_deta = abs(jet1_away.eta - jet2_away.eta)
+        #vbf_mjj = (jet1_away + jet2_away).mass
+        vbf_deta = events.vbs.detajj
+        vbf_mjj = events.vbs.mjj
+        vbf_score = events.vbs.score
+        abcd_score = events.ABCD_score
+        HT = events.ht.fatjets
         isvbf = (vbf_deta > 2.5) & (vbf_mjj > 750)
         isvbf = ak.fill_none(isvbf, False)
 
@@ -456,7 +619,6 @@ class categorizer(SkimmerABC):
 
         selection.add("2ak4s", nak4s_vbf > 1)
         selection.add("isvbf", isvbf)
-
         gen_variables = {}
         btag_SF = ak.ones_like(events.run)
 
@@ -582,6 +744,7 @@ class categorizer(SkimmerABC):
                 "HiggsAK8_pnetTXgg": candidatejet.particleNet_XggVsQCD,
                 "HiggsAK8_pnetTQCD": candidatejet.particleNet_QCD,
                 "HiggsAK8_pnetXbbXcc": candidatejet.pnetXbbXcc,
+                "Hscore": Hscore,                
                 "VAK8_pt": candidateVjet.pt,
                 "VAK8_phi": candidateVjet.phi,
                 "VAK8_eta": candidateVjet.eta,
@@ -595,8 +758,13 @@ class categorizer(SkimmerABC):
                 "VAK8_pnetTXgg": candidateVjet.particleNet_XggVsQCD,
                 "VAK8_pnetTQCD": candidateVjet.particleNet_QCD,
                 "VAK8_pnetXbbXcc": candidateVjet.pnetXbbXcc,
+                "VZscore": VZscore,
+                "VWscore": VWscore,
                 "VBFPair_mjj": vbf_mjj,
                 "VBFPair_deta": vbf_deta,
+                "VBFPair_score": vbf_score,
+                "ABCD_score": abcd_score,
+                "HT": HT,
                 "MET": met.pt,
                 "LepPair_mass": ak.fill_none(lep_mass, -999.),
                 "LeadingLep_pt": leadinglep.pt,

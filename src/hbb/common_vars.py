@@ -3,6 +3,7 @@ from __future__ import annotations
 DATA_SAMPLES = ["JetMET", "Muon", "ParkingHH", "ParkingSingleMuon", "ParkingVBF"]
 
 LUMI = {
+    "2018": 59800,
     "2022": 7980.5,
     "2022EE": 26671.6,
     "2023": 18084.4,

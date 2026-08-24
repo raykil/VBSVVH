@@ -18,16 +18,39 @@ normalize_year() {
             ;;
     esac
 }
-
+case "$1" in
+    1FJ_r3)
+        process_tag="merged_2lep_1FJ_r3_2lep_1FJ_20260615211529_2lep_1FJ"
+        ;;
+    2FJ_r3)
+        process_tag="merged_2lep_2FJ_r3_2lep_2FJ_20260615211951_2lep_2FJ"
+        ;;
+    2FJ_r2)
+        process_tag="merged_2lep_2FJ_r2_2lep_2FJ_20260615211710_2lep_2FJ"
+        ;;
+    1FJ_r2)
+        process_tag="merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ"
+        ;;
+    *)
+        echo "Unknown dataset: $2"
+        exit 1
+        ;;
+esac
 # remove old files
 rm -r local_hvv/
 mkdir local_hvv/
 
-tag="hvv_26June6"
-process_tag="merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ"
-basedir="/eos/user/r/rband/HVV2LRDF/merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ"
+tag="hvv_26Aug19"
+#process_tag="merged_2lep_1FJ_r3_2lep_1FJ_20260615211529_2lep_1FJ"
+#process_tag="merged_2lep_2FJ_r3_2lep_2FJ_20260615211951_2lep_2FJ"
+#process_tag="merged_2lep_2FJ_r2_2lep_2FJ_20260615211710_2lep_2FJ"
+#process_tag="merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ"
+basedir="/eos/user/r/rband/HVV2LRDF/${process_tag}"
 indir="${basedir}"
-
+json_name="${process_tag%_2lep_[12]FJ}.json"
+nFJ=${process_tag##*_2lep_}
+nFJ=${nFJ%FJ}
+echo $nFJ
 #signal
 # process_tag="merged_2lep_1FJ_r3_2lep_1FJ_20260504235849"
 # basedir="/eos/user/r/rband/HVV2LRDF/2lep_1FJ_r3_2lep_1FJ/"
@@ -43,18 +66,18 @@ indir="${basedir}"
 # indir="${basedir}/merged_2lep_1FJ_r2_2lep_1FJ_20260430154928_2lep_1FJ/"
 outdir="/store/user/rband/${tag}/${process_tag}"
 #xrdcp "root://eosuser.cern.ch///${basedir}/${process_tag}.json" .
-xrdcp "root://eosuser.cern.ch///${basedir}/merged_2lep_1FJ_r2_2lep_1FJ_20260615211230.json" .
+xrdcp "root://eosuser.cern.ch///${basedir}/${json_name}" .
 
 count=0
 #for process in $(jq -r '.samples | keys[]' "${process_tag}.json")
-for process in $(jq -r '.samples | keys[]' "merged_2lep_1FJ_r2_2lep_1FJ_20260615211230.json")
+for process in $(jq -r '.samples | keys[]' "${json_name}")
 do
 
-    year_raw=$(jq -r --arg proc "$process" '.samples[$proc].metadata.year' "merged_2lep_1FJ_r2_2lep_1FJ_20260615211230.json")
+    year_raw=$(jq -r --arg proc "$process" '.samples[$proc].metadata.year' "${json_name}")
     year=$(normalize_year "$year_raw")
-    if [[ "$year" == "2018" ]]; then
-	continue
-    fi
+#    if [[ "$year" == "2018" ]]; then
+#	continue
+#    fi
     echo "Processing sample: $process"
 #    echo "Using year: $year"
     ((count++))
@@ -84,7 +107,7 @@ do
 
         # Example: pass to your command
         # python src/run.py --year "${year}" --nano-version v15 --save-skim  --files root://eosuser.cern.ch//${infile}
-        python src/run.py --year "${year}" --nano-version v15 --save-skim  --files "${file_list[@]}" --dataset "${process}"
+        python src/run.py --year "${year}" --nano-version v15 --save-skim  --files "${file_list[@]}" --dataset "${process}" --nFJ ${nFJ}
 
 
         # Move final output to EOS

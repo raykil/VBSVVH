@@ -95,6 +95,7 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
         skim_outpath="outparquet",
         btag_eff=args.btag_eff,
         save_skim_nosysts=args.save_skim_nosysts,
+        nFJ=args.nFJ
     )
 
     full_tg, rep = apply_to_fileset(
@@ -238,6 +239,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--yaml", default=None, help="yaml file with samples and subsamples", type=str
+    )
+    parser.add_argument(
+        "--nFJ", default=1, help="1FJ or 2FJ category", type=int
     )
     parser.add_argument(
         "--BDT",
