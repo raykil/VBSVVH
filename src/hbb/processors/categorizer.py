@@ -15,12 +15,7 @@ from coffea.ml_tools import xgboost_wrapper
 from hist.dask import Hist
 from sklearn.preprocessing import MinMaxScaler
 
-from hbb.corrections import (
-    mupt_variations,
-)
-from hbb.jerc_eras import jerc_variations, run_map
 from hbb.processors.SkimmerABC import SkimmerABC
-from hbb.taggers import b_taggers
 
 from .GenSelection import (
     bosonFlavor,
@@ -35,10 +30,8 @@ from .objects import (
     good_electrons,
     loose_muons,
     highpt_muons,
-    good_photons,
     set_ak4jets,
     set_ak8jets,
-    tight_photons,
 )
 from .abcd_model import *
 logger = logging.getLogger(__name__)
@@ -60,80 +53,6 @@ gen_selection_dict = {
     "ZGto2QG-": gen_selection_Vg,
 }
 _abcd_model_cache = {}
-def get_BDT_model(BDT_file: str):
-    bdt_features = [
-        "nFatJet",
-        "nJet",
-        "FatJet0_phi",
-        "FatJet0_eta",
-        "FatJet0_n2b1",
-        "FatJet0_n3b1",
-        "FatJet1_pt",
-        "FatJet1_phi",
-        "FatJet1_eta",
-        "FatJet1_msd",
-        "FatJet1_pnetMass",
-        "FatJet1_pnetTXbb",
-        "FatJet1_pnetTXcc",
-        "FatJet1_pnetTXqq",
-        "FatJet1_pnetTXgg",
-        "VBFPair_mjj",
-        "VBFPair_deta",
-        "Photon0_pt",
-        "Jet0_pt",
-        "Jet0_eta",
-        "Jet0_phi",
-        "Jet0_mass",
-        "Jet0_btagPNetB",
-        "Jet0_btagPNetCvB",
-        "Jet0_btagPNetCvL",
-        "Jet0_btagPNetQvG",
-        "Jet1_pt",
-        "Jet1_eta",
-        "Jet1_phi",
-        "Jet1_mass",
-        "Jet1_btagPNetB",
-        "Jet1_btagPNetCvB",
-        "Jet1_btagPNetCvL",
-        "Jet1_btagPNetQvG",
-        "Jet2_pt",
-        "Jet2_eta",
-        "Jet2_phi",
-        "Jet2_mass",
-        "Jet2_btagPNetB",
-        "Jet2_btagPNetCvB",
-        "Jet2_btagPNetCvL",
-        "Jet2_btagPNetQvG",
-        "Jet3_pt",
-        "Jet3_eta",
-        "Jet3_phi",
-        "Jet3_mass",
-        "Jet3_btagPNetB",
-        "Jet4_btagPNetCvB",
-        "Jet4_btagPNetCvL",
-        "Jet4_btagPNetQvG",
-        "JetClosestFatJet0_pt",
-        "JetClosestFatJet0_eta",
-        "JetClosestFatJet0_phi",
-        "JetClosestFatJet0_mass",
-    ]
-
-    class xgboost_model(xgboost_wrapper):
-        # Define how to prepare awkward arrays for BDT evaluation
-        def prepare_awkward(self, events):
-            features = []
-            for name in bdt_features:
-                feat = events[name]
-                feat = ak.fill_none(feat, -999.0)
-                features.append(feat[:, np.newaxis])
-            ret = ak.concatenate(features, axis=1)
-            return [], dict(data=ret)
-
-    booster = xgb.Booster()
-    booster.load_model(Path.cwd() / BDT_file)
-    booster.feature_names = None  # Disable feature name checking
-    model = xgboost_model(booster)
-    return model
 
 def _safe_minmax_scale(values):
     scaled = np.zeros_like(values, dtype=np.float64)
@@ -292,7 +211,6 @@ class categorizer(SkimmerABC):
         systematics=False,
         save_skim=False,
         skim_outpath="",
-        evaluate_BDT=True,
         btag_eff=False,
         save_skim_nosysts=False,
         nFJ=1,
@@ -311,19 +229,12 @@ class categorizer(SkimmerABC):
         if self._skip_syst:
             self._save_skim = True
         self._skim_outpath = skim_outpath
-        self._evaluate_BDT = evaluate_BDT
         self._btag_eff = btag_eff
         self._mupt_type = "pt" #"ptcorr"
         self._nFJ = nFJ
-        if self._evaluate_BDT:
-            self.bdt_model = get_BDT_model("src/hbb/data/MultiClassBDT_23Oct25.ubj")
         
         with Path("src/hbb/dilep_triggers.json").open() as f:
             self._triggers = json.load(f)
-
-        # https://twiki.cern.ch/twiki/bin/view/CMS/MissingETOptionalFiltersRun2
-        with Path("src/hbb/metfilters.json").open() as f:
-            self._met_filters = json.load(f)
 
         self.make_output = lambda: {
             "cutflow": Hist.new.StrCat([], growth=True, name="region", label="Region")
@@ -365,8 +276,6 @@ class categorizer(SkimmerABC):
         """
         total_variations = (
             ["nominal"]
-            # + [f"{var}_{dir}" for var in jerc_variations for dir in ["Up", "Down"]]
-            # + [f"{var}_{dir}" for var in mupt_variations for dir in ["Up", "Down"]]
         )
 
         """
@@ -502,9 +411,6 @@ class categorizer(SkimmerABC):
         # v15 corrections not available for run2 ul - so not implemented in current test - /cvmfs/cms-griddata.cern.ch/cat/metadata//MUO/
         # muons = correct_muons(events.muon, events, self._year, isRealData)
         muons = events.muon
-        if shift_name != "nominal" and "Muon" in shift_name:
-            var, direction = shift_name.split("_")
-            self._mupt_type = f"{mupt_variations[var]}_{direction.lower()}"
 
         goodmuons = highpt_muons(muons, self._mupt_type)
         nmuons = ak.num(goodmuons, axis=1)
