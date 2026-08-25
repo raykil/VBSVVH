@@ -93,10 +93,40 @@ do
     file_list=()
     while IFS= read -r infile
     do
-        file_list+=("root://eosuser.cern.ch//${infile}")
+    rootfile="root://eosuser.cern.ch//${infile}"
+
+    # Get number of entries in the Events tree
+
+    nentries=$(python - "$rootfile" <<'PY'
+import sys
+import ROOT
+
+f = ROOT.TFile.Open(sys.argv[1])
+if not f or f.IsZombie():
+    print(-1)
+else:
+    t = f.Get("Events")
+    print(t.GetEntries() if t else -1)
+    f.Close()
+PY
+)
+
+
+    if [[ "$nentries" =~ ^[0-9]+$ ]] && [[ "$nentries" -gt 0 ]]; then
+        echo "Adding: $rootfile ($nentries events)"
+        file_list+=("$rootfile")
+    else
+        echo "Skipping empty/unreadable file: $rootfile (entries=$nentries)"
+    fi   
     done < <(xrdfs root://eosuser.cern.ch ls "${indir}/${process}")
     # xrdfs root://eosuser.cern.ch ls "${indir}/${process}" | while IFS= read -r infile 
     # do
+    # Skip this process if no non-empty ROOT files were found
+    if [[ ${#file_list[@]} -eq 0 ]]; then
+        echo "No non-empty ROOT files found for ${process}, skipping."
+        continue
+    fi
+
         echo "Processing: $infile"
 
         # base=$(basename "$infile") 
