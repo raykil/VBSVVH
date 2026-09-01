@@ -38,7 +38,7 @@ gen_selection_dict = {
 _abcd_model_cache = {}
 
 def _safe_minmax_scale(values):
-    scaled = np.zeros_like(values, dtype=np.float64)
+    if values.size == 0: return values  # empty partition: MinMaxScaler rejects a (0, 1) array
     scaler = MinMaxScaler()
     scaled = scaler.fit_transform(values.reshape(-1, 1)).ravel()
     return scaled
@@ -125,6 +125,8 @@ def eval_ABCD_model(events, nFJ=1, saved_model="best_model.pt"):
         for arr in feature_map.values():
             arr.layout._touch_data(recursive=True)
         return ak.zeros_like(events.met.pt)  # correct shape/dtype, no real data
+    if len(events.met.pt) == 0:
+        return ak.zeros_like(events.met.pt)  # no events: nothing to feed the model
 
     features = list(feature_transforms.keys())
     columns = []
@@ -539,7 +541,7 @@ class categorizer(SkimmerABC):
         msd_matched = candidatejet.msd
 
         regions = {
-            "signal-wwh": [
+            "signal_wwh": [
                 # "trigger",
                 # "ak4jetveto",
                 "twoleptons",
@@ -553,7 +555,7 @@ class categorizer(SkimmerABC):
                 # "isvbf",
 
             ],
-            "signal-zzh-1FJ": [
+            "signal_zzh_1FJ": [
                 # "trigger",
                 # "ak4jetveto",
                 "twoleptons",
@@ -567,7 +569,7 @@ class categorizer(SkimmerABC):
                 "2ak4s",
                 # "isvbf",
             ],
-            "signal-wzh-zzh-2FJ": [
+            "signal_wzh_zzh_2FJ": [
                 # "trigger",
                 # "ak4jetveto",
                 "twoleptons",
