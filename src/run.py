@@ -4,14 +4,12 @@ Runs a coffea processors on a single file or a set of files (ONLY for testing)
 
 from __future__ import annotations
 
-import argparse
-import pickle
-import shutil
+import argparse, pickle, shutil, warnings, dask, uproot, yaml
 from pathlib import Path
 
-import dask
-import uproot
-import yaml
+warnings.filterwarnings("ignore", category=FutureWarning, module="coffea.*")
+warnings.filterwarnings("ignore", category=FutureWarning, message=".*reduce_op.*")
+
 from coffea import nanoevents
 from coffea.dataset_tools import apply_to_fileset, max_chunks, preprocess
 
@@ -19,15 +17,14 @@ from hbb.rdf_schema import RDFSchema
 from hbb.run_utils import get_dataset_spec, get_fileset
 from hbb.xsecs import xsecs
 
-
 def run(year: str, fileset: dict, args: argparse.Namespace):
     """Run processor without fancy dask (outputs then need to be accumulated manually)"""
 
     local_dir = Path().resolve()
 
     if args.save_skim or args.save_skim_nosysts:
-        # intermediate files are stored in the "./outparquet" local directory
-        local_parquet_dir = local_dir / "outparquet"
+        # intermediate files are stored in the "./tmp_parq" local directory
+        local_parquet_dir = local_dir / "tmp_parq"
         if local_parquet_dir.is_dir():
             shutil.rmtree(local_parquet_dir)
         local_parquet_dir.mkdir(parents=True, exist_ok=True)
@@ -52,7 +49,7 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
             schemaclass=nanoevents.NanoAODSchema,
             metadata={"dataset": "test"},
         ).events()
-        print(events.metadata)
+        # print(events.metadata)
         # Uncomment the following lines to run the processor directly on the events
         # out = p.process(events)
         # (computed,) = dask.compute(out)
@@ -75,12 +72,7 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
         },
         step_size_safety_factor=0.5,
     )
-    print(
-        "Number of files preprocessed: ",
-        len(preprocessed_available),
-        " out of ",
-        len(preprocessed_total),
-    )
+    print(f"Number of files preprocessed: {len(preprocessed_available)}/{len(preprocessed_total)}")
 
     # TODO: customize processor
     from hbb.processors import categorizer
@@ -91,7 +83,7 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
         year=year,
         nano_version=args.nano_version,
         save_skim=args.save_skim,
-        skim_outpath="outparquet",
+        skim_outpath="tmp_parq",
         btag_eff=args.btag_eff,
         save_skim_nosysts=args.save_skim_nosysts,
         nFJ=args.nFJ
@@ -112,7 +104,7 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
 
     # save the output to a pickle file
     with Path(f"{local_dir}/local_hvv/{args.starti}-{args.endi}.pkl").open("wb") as f:
-        pickle.dump(output, f)
+        pickle.dump(output, f) # saving pickle
     print("Saved output to ", f"{local_dir}/{args.starti}-{args.endi}.pkl")
 
     # COMBINE FILES
@@ -146,7 +138,7 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
 
                 table = pa.Table.from_pandas(pddf)
                 # This saves the combined file as {local_var}_{region_name}.parquet locally
-                output_file = f"{local_dir}/local_hvv/{local_var}_{region_name}.parquet"
+                output_file = f"{local_dir}/local_hvv/{local_var}_{region_name}.parquet" # saving parquet
                 pq.write_table(table, output_file)
                 print("Saved parquet file to ", output_file)
 
@@ -156,9 +148,7 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
 
 
 def main(args):
-
-    print(args)
-
+    # print(args)
     if len(args.files):
         fileset = {f"{args.year}_{args.files_name}": args.files}
     else:
@@ -185,83 +175,30 @@ def main(args):
             subsamples,
             args.starti,
             args.endi,
-        )
+        ) # {'2016_files': ['root://eosuser.cern.ch///eos/user/r/rband/HVV2LRDF/merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ/VBSWWH_OS_c2v1p0_c3_10p0_UL16/output_0.root']}
 
-    print(f"Running on fileset {fileset}")
+    # print(f"Running on fileset {fileset}")
     run(args.year, fileset, args)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument(
-        "--year",
-        help="year",
-        type=str,
-        default="2023",
-        choices=["2016APV", "2016", "2017", "2018", "2022", "2022EE", "2023", "2023BPix", "2024"],
-    )
-    parser.add_argument(
-        "--dataset",
-        help="dataset name",
-        type=str,
-        required=True
-    )
-    parser.add_argument("--starti", default=0, help="start index of files", type=int)
-    parser.add_argument("--endi", default=-1, help="end index of files", type=int)
-    parser.add_argument(
-        "--samples",
-        default=[],
-        help="which samples to run",  # , default will be all samples",
-        nargs="*",
-    )
-    parser.add_argument(
-        "--subsamples",
-        default=[],
-        help="which subsamples, by default will be all in the specified sample(s)",
-        nargs="*",
-    )
-    parser.add_argument(
-        "--nano-version",
-        type=str,
-        default="v15",
-        choices=["v12", "v12v2_private", "v14_private", "v15"],
-        help="NanoAOD version",
-    )
-    parser.add_argument(
-        "--files", default=[], help="set of files to run on instead of samples", nargs="*"
-    )
-    parser.add_argument(
-        "--files-name",
-        type=str,
-        default="files",
-        help="sample name of files being run on, if --files option used",
-    )
-    parser.add_argument(
-        "--yaml", default=None, help="yaml file with samples and subsamples", type=str
-    )
-    parser.add_argument(
-        "--nFJ", default=1, help="1FJ or 2FJ category", type=int
-    )
+    parser.add_argument('-y' , "--year"        , type=str, default="2023" , choices=["2016APV", "2016", "2017", "2018", "2022", "2022EE", "2023", "2023BPix", "2024"])
+    parser.add_argument('-d' , "--dataset"     , type=str, required=True)
+    parser.add_argument('-fj', "--nFJ"         , type=int, default=1      , help="1FJ or 2FJ category")
+    parser.add_argument('-v' , "--nano-version", type=str, default="v15"  , choices=["v12", "v12v2_private", "v14_private", "v15"])
+    parser.add_argument('-f' , "--files"       , type=str, default=[]     , help="set of files to run on instead of samples", nargs="*")
+
+    parser.add_argument('-i' , "--starti"      , type=int, default=0      , help="start index of files")
+    parser.add_argument('-j' , "--endi"        , type=int, default=-1     , help="end index of files")
+    parser.add_argument('-s' , "--samples"     , type=str, default=[]     , help="whichp samples to run. Default is all samles") # nargs="*"
+    parser.add_argument('-u' , "--subsamples"  , type=str, default=[]     , help="which subsamples, by default will be all in the specified sample(s)", nargs="*")
+    parser.add_argument('-n' , "--files-name"  , type=str, default="files", help="sample name of files being run on, if --files option used")
+    parser.add_argument('-l' , "--yaml"        , type=str, default=None   , help="yaml file with samples and subsamples")
+
     group = parser.add_mutually_exclusive_group()
-    group.add_argument(
-        "--save-skim",
-        action="store_true",
-        help="save skimmed (flat ntuple) files",
-        default=False,
-    )
-    group.add_argument(
-        "--btag-eff",
-        action="store_true",
-        help="compute b-tag efficiencies for mc",
-        default=False,
-    )
-    group.add_argument(
-        "--save-skim-nosysts",
-        action="store_true",
-        help="save skimmed files, skip systematics",
-        default=False,
-    )
-
+    group.add_argument( "--save-skim", default=False, action="store_true", help="save skimmed (flat ntuple) files")
+    group.add_argument( "--btag-eff", action="store_true", help="compute b-tag efficiencies for mc", default=False)
+    group.add_argument( "--save-skim-nosysts", action="store_true", help="save skimmed files, skip systematics", default=False)
     args = parser.parse_args()
-
     main(args)

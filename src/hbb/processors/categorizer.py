@@ -1,38 +1,21 @@
 from __future__ import annotations
 
-import json
-import logging
-import time
-import torch
+import time, json, torch, logging
 from pathlib import Path
 
 import awkward as ak
 import dask_awkward as dak
 import numpy as np
-import xgboost as xgb
+# import xgboost as xgb
 from coffea.analysis_tools import PackedSelection, Weights
-from coffea.ml_tools import xgboost_wrapper
+# from coffea.ml_tools import xgboost_wrapper
 from hist.dask import Hist
 from sklearn.preprocessing import MinMaxScaler
 
 from hbb.processors.SkimmerABC import SkimmerABC
 
-from .GenSelection import (
-    bosonFlavor,
-    gen_selection_Hbb,
-    gen_selection_V,
-    gen_selection_Vg,
-    getBosons,
-)
-from .objects import (
-    good_ak4jets,
-    good_ak8jets,
-    good_electrons,
-    loose_muons,
-    highpt_muons,
-    set_ak4jets,
-    set_ak8jets,
-)
+from .GenSelection import (bosonFlavor, gen_selection_Hbb, gen_selection_V, gen_selection_Vg, getBosons)
+from .objects import (good_ak4jets, good_ak8jets, good_electrons, loose_muons, highpt_muons, set_ak4jets, set_ak8jets)
 from .abcd_model import *
 logger = logging.getLogger(__name__)
 
@@ -289,7 +272,7 @@ class categorizer(SkimmerABC):
         Add weights that are not region specific
         """
 
-        print(events.weight)
+        # print(events.weight)
 
         weights.add("genweight", events.baseweight / events.xsecweight )
 
@@ -369,11 +352,12 @@ class categorizer(SkimmerABC):
 
         ###################### Normalization (Step 1) ######################
         # strip the year from the dataset name
-        dataset_no_year = dataset.replace(f"{self._year}_", "")
-        weight_norm = 1000.0 * events.lumi * events.xsec / events.sumw
+        # dataset_no_year = dataset.replace(f"{self._year}_", "")
         # normalize all the weights to xsec, needs to be divided by totals in Step 2 in post-processing
-        for key, val in weights_dict.items():
-            weights_dict[key] = val * weight_norm
+        if not self._isData: # data has sumw=0, so skip it rather than divide by zero
+            weight_norm = 1000.0 * events.lumi * events.xsec / events.sumw
+            for key, val in weights_dict.items():
+                weights_dict[key] = val * weight_norm
 
         # save the unnormalized weight, to confirm that it's been normalized in post-processing
         weights_dict["weight_noxsec"] = weights.partial_weight(include=include_weights)
@@ -388,7 +372,7 @@ class categorizer(SkimmerABC):
         selection = PackedSelection()
         output = self.make_output() if not self._btag_eff else self.make_btag_output()
         weights = Weights(None, storeIndividual=True)
-        print(events.fields)
+        # print(events.fields) # ['v1qq', 'nElectron', 'excluded', 'v1q2', 'lepton', 'b2', 'name', 'run', 'year', 'empty', 'shortname', 'met', 'is2017', 'muon', 'truth', 'nFatJets', 'ht', 'v2q1', 'luminosityBlock', 'vbs1', 'HLT', 'hbb', 'nMuon', 'is2018', 'v2qq', 'is2023', 'HEMVeto', 'is2024', 'LHEReweightingWeight', 'sumw', 'kind', 'xsec', 'do', 'fatjet', 'matched', 'xsecweight', 'v1q1', 'isData', 'vbs2', 'event', 'weight', 'isRun2', 'gen', 'b1', 'is2016', 'is2022', 'v2q2', 'lumi', 'electron', 'vbs', 'baseweight', 'isRun3', 'jet', 'ABCD_score']
 
         # TODO -------- HLT CURRENTLY NOT IN RDF PATHS
         # Below implements the dilepton triggers in the selection
