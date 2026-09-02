@@ -125,64 +125,37 @@ def load_samples(
             # print(list(Path(data_dir / dataset / "parquet").glob(f'{region}*.parquet')))
             # print(f"Columns to load: {columns_to_load}")
 
-            search_path = Path(data_dir / dataset / "parquet" / "nominal" / region)
-            if variation:
-                search_path = Path(data_dir / dataset /  "parquet" / variation / region)
-            # print(f"\n[DEBUG] Script is searching in path: {search_path}\n")
+            search_path = Path(data_dir / dataset / f"{variation or 'nominal'}_{region}.parq")
+            # print(f"\n[DEBUG] Script is searching for file: {search_path}\n")
 
-            # --- REPLACE THE OLD 'try' BLOCK WITH THIS ---
             try:
-                # Use os.listdir() which can be more robust on network filesystems
-                if search_path.exists():
-                    file_list = [f for f in search_path.iterdir() if f.name.endswith(".parquet")]
-                    # print(f"[DEBUG] Found files with os.listdir: {file_list}")
-                else:
-                    print(f"[DEBUG] Path does not exist: {search_path}")
-                    file_list = []
-
-                # If no files were found, skip to the next dataset
-                if not file_list:
+                if not search_path.exists():
                     warnings.warn(
-                        f"No parquet files found in {search_path}. Skipping dataset {dataset}.",
+                        f"No parquet file found at {search_path}. Skipping dataset {dataset}.",
                         stacklevel=2,
                     )
                     continue
 
                 events = pd.read_parquet(
-                    file_list,
+                    search_path,
                     filters=filters,
                     columns=columns_to_load,
                 )
-            # --- END REPLACEMENT ---
-
-            # try:
-            # Load the dataset into a DataFrame
-            #    events = pd.read_parquet(
-            #        list(Path(data_dir / dataset / "parquet").glob(f"{region}*.parquet")),
-            #        filters=filters,
-            #        columns=columns_to_load,
-            #    )
             except pa.lib.ArrowInvalid as e:
                 warnings.warn(f"ArrowInvalid error: {e}. Skipping dataset {dataset}.", stacklevel=2)
                 print("List of columns attempted to load: ", columns_to_load)
-                print(
-                    "List of files available: ",
-                    list(Path(data_dir / dataset / "parquet").glob(f"{region}*.parquet")),
-                )
+                print("List of files available: ", list(search_path.parent.glob("*.parq")))
                 continue
             except:
                 print(f"Error loading dataset: {dataset}. Skipping.")
-                print(
-                    "List of files available: ",
-                    list(Path(data_dir / dataset / "parquet").glob(f"{region}*.parquet")),
-                )
+                print("List of files available: ", list(search_path.parent.glob("*.parq")))
                 continue
 
             events["finalWeight"] = events["weight"]
 
             # Add the DataFrame to the dictionary with the dataset name as the key
             events_list.append(events)
-            print(f"Loaded {dataset: <50}: {len(events)} entries")
+            print(f"Loaded {dataset: <35}: {len(events)} entries (weighted: {events['finalWeight'].sum():.2f})")
 
         # Combine all DataFrames for the process/sample
         # print(events_list)

@@ -66,18 +66,46 @@ pip install -e .
 pip install -r requirements.txt
 ```
 
+## Workflow
 
-## Run processor locally
-
-**In your micromamba environment:**
+### 0. Environment setup
+``` bash
+# One-time thing
+conda create -y -n hbb python=3.10 root -c conda-forge
+conda activate hbb
+pip install -e . -r requirements.txt
 ```
-micromamba activate hbb
-source local_hvv.sh
+
+``` bash
+# Every login
+conda activate hbb
+voms-proxy-init --rfc --voms cms -valid 192:00
 ```
 
-## Plotting features from parquet files
+### 1. Run the categorizer
+`src/hbb/processors/categorizer.py` is a coffea processor that 1) takes in NanoAOD files, 2) apply selection/corrections, 3) evaluates ABCD NN score, 4) sorts events into regions (wwh, zzh_1FJ, zzh_2FJ), and 5) return 1 parquet per region and a cutflow pkl.
 
-Example:
+`local_hvv.sh` ->`local_hvv.py` → `src/run.py` → `src/hbb/processors/categorizer.py`
+``` bash
+# STEP 1
+python local_hvv.py -c run2_1FJ -r
+python local_hvv.py -c run2_2FJ -r
+python local_hvv.py -c run3_1FJ -r
+python local_hvv.py -c run3_2FJ -r
 ```
-python make_histos.py  --region signal-wwh --year 2022
+`src/run.py` is run per dataset, i.e., keys in `sample_json/samples_run*_2L_*FJ.json`. Output is stored in `output_run*_*FJ/{year}/{dataset}`.
+
+### 2. Create histograms
+```bash
+# STEP 2
+python python/make_histos.py -c $channel -y $year -r $region
+```
+Run `python python/make_histos.py -h` to see options. Output are 1) pickles and 2) plots in `histograms/run*_*FJ/{year}/signal_*`. Pickles contain cutflow. To look at the content, run:
+```bash
+python inspect_cutflow.py -c $channel -y $year -r $region
+```
+
+### 3. Draw histograms
+```bash
+python python/plot_histos.py
 ```

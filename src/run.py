@@ -72,7 +72,6 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
         },
         step_size_safety_factor=0.5,
     )
-    print(f"Number of files preprocessed: {len(preprocessed_available)}/{len(preprocessed_total)}")
 
     # TODO: customize processor
     from hbb.processors import categorizer
@@ -105,7 +104,6 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
     # save the output to a pickle file
     with Path(f"{local_dir}/local_hvv/{args.starti}-{args.endi}.pkl").open("wb") as f:
         pickle.dump(output, f) # saving pickle
-    print("Saved output to ", f"{local_dir}/{args.starti}-{args.endi}.pkl")
 
     # COMBINE FILES
     # otherwise it will complain about too many small files
@@ -140,10 +138,8 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
                 # This saves the combined file as {local_var}_{region_name}.parquet locally
                 output_file = f"{local_dir}/local_hvv/{local_var}_{region_name}.parquet" # saving parquet
                 pq.write_table(table, output_file)
-                print("Saved parquet file to ", output_file)
 
         # remove subfolder
-        print("Removing temporary folder: ", local_parquet_dir)
         shutil.rmtree(local_parquet_dir)
 
 

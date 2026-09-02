@@ -85,41 +85,47 @@ def eval_ABCD_model(events, nFJ=1, saved_model="best_model.pt"):
         _abcd_model_cache[saved_model] = model
     model = _abcd_model_cache[saved_model]
     if nFJ == 1:
-        feature_transforms = {"lepton_pt_1":"log","lepton_pt_2":"log",
-                        "lepton_eta_1":"minmax","lepton_eta_2":"minmax",
-                        "lepton_phi_1":"minmax","lepton_phi_2":"minmax",
-                        "lepton_mass_1":"log","lepton_mass_2":"log",
-                        "met_phi":"minmax","met_pt":"log",
-                        "fatjet_pt":"log","fatjet_eta":"minmax","fatjet_phi":"minmax","fatjet_mass":"log",
-                        "fatjet_tau2":"none","fatjet_tau1":"none"}
+        # Order is important here!!
+        feature_transforms = {
+            "lepton_pt_1"  : "log"   ,    "lepton_pt_2"  : "log",
+            "lepton_eta_1" : "minmax",    "lepton_eta_2" : "minmax",
+            "lepton_phi_1" : "minmax",    "lepton_phi_2" : "minmax",
+            "lepton_mass_1": "log"   ,    "lepton_mass_2": "log",
+            "met_phi"      : "minmax",    "met_pt"       : "log",
+            "fatjet_pt"    : "log"   ,    "fatjet_eta"   : "minmax",
+            "fatjet_phi"   : "minmax",    "fatjet_mass"  : "log",
+            "fatjet_tau2"  : "none"  ,    "fatjet_tau1"  : "none"
+        }
     elif nFJ == 2:
-        feature_transforms = {"lepton_pt_1":"log","lepton_pt_2":"log",
-                        "lepton_eta_1":"minmax","lepton_eta_2":"minmax",
-                        "lepton_phi_1":"minmax","lepton_phi_2":"minmax",
-                        "lepton_mass_1":"log","lepton_mass_2":"log",
-                        "met_phi":"minmax","met_pt":"log",
-                        "fatjet_pt_1":"log","fatjet_pt_2":"log",
-                        "fatjet_eta_1":"minmax","fatjet_eta_2":"minmax",
-                        "fatjet_phi_1":"minmax","fatjet_phi_2":"minmax",
-                        "fatjet_mass_1":"log", "fatjet_mass_2":"log",
-                        "fatjet_msoftdrop_1":"log", "fatjet_msoftdrop_2":"log",
-                        "fatjet_tau2_1":"none","fatjet_tau1_1":"none",
-                        "fatjet_tau2_2":"none","fatjet_tau1_2":"none",
-                        "ht_fatjets":"log"}
+        feature_transforms = {
+            "lepton_pt_1"       :"log"   ,    "lepton_pt_2"       : "log",
+            "lepton_eta_1"      :"minmax",    "lepton_eta_2"      : "minmax",
+            "lepton_phi_1"      :"minmax",    "lepton_phi_2"      : "minmax",
+            "lepton_mass_1"     :"log"   ,    "lepton_mass_2"     : "log",
+            "met_phi"           :"minmax",    "met_pt"            : "log",
+            "fatjet_pt_1"       :"log"   ,    "fatjet_pt_2"       : "log",
+            "fatjet_eta_1"      :"minmax",    "fatjet_eta_2"      : "minmax",
+            "fatjet_phi_1"      :"minmax",    "fatjet_phi_2"      : "minmax",
+            "fatjet_mass_1"     :"log"   ,    "fatjet_mass_2"     : "log",
+            "fatjet_msoftdrop_1":"log"   ,    "fatjet_msoftdrop_2": "log",
+            "fatjet_tau2_1"     :"none"  ,    "fatjet_tau1_1"     : "none",
+            "fatjet_tau2_2"     :"none"  ,    "fatjet_tau1_2"     : "none",
+            "ht_fatjets"        :"log"
+        }
     else:
         raise ValueError(f"Invalid nFJ value: {nFJ}. Must be 1 or 2.")
     feature_map = {
-        "lepton_pt_1":events.lepton.pt,"lepton_eta_1":events.lepton.eta,"lepton_phi_1":events.lepton.phi,"lepton_mass_1":events.lepton.mass,
-        "lepton_pt_2":events.lepton.pt,"lepton_eta_2":events.lepton.eta,"lepton_phi_2":events.lepton.phi,"lepton_mass_2":events.lepton.mass,
-        "met_phi":events.met.phi,"met_pt":events.met.pt,
-        "fatjet_pt":events.fatjet.pt,"fatjet_eta":events.fatjet.eta,"fatjet_phi":events.fatjet.phi,"fatjet_mass":events.fatjet.mass,
-        "fatjet_tau2":events.fatjet.tau2, "fatjet_tau1":events.fatjet.tau1,
-        "fatjet_pt_1":events.fatjet.pt,"fatjet_eta_1":events.fatjet.eta,"fatjet_phi_1":events.fatjet.phi,"fatjet_mass_1":events.fatjet.mass,
-        "fatjet_pt_2":events.fatjet.pt,"fatjet_eta_2":events.fatjet.eta,"fatjet_phi_2":events.fatjet.phi,"fatjet_mass_2":events.fatjet.mass,
-        "fatjet_tau2_1":events.fatjet.tau2,"fatjet_tau1_1":events.fatjet.tau1,
-        "fatjet_tau2_2":events.fatjet.tau2,"fatjet_tau1_2":events.fatjet.tau1,
-        "fatjet_msoftdrop_1":events.fatjet.msoftdrop,"fatjet_msoftdrop_2":events.fatjet.msoftdrop,
-        "ht_fatjets":events.ht.fatjets
+        "lepton_pt_1"       : events.lepton.pt       ,"lepton_eta_1"      : events.lepton.eta      , "lepton_phi_1": events.lepton.phi, "lepton_mass_1": events.lepton.mass,
+        "lepton_pt_2"       : events.lepton.pt       ,"lepton_eta_2"      : events.lepton.eta      , "lepton_phi_2": events.lepton.phi, "lepton_mass_2": events.lepton.mass,
+        "met_phi"           : events.met.phi         ,"met_pt"            : events.met.pt          ,
+        "fatjet_pt"         : events.fatjet.pt       ,"fatjet_eta"        : events.fatjet.eta      , "fatjet_phi"  : events.fatjet.phi, "fatjet_mass"  : events.fatjet.mass,
+        "fatjet_tau2"       : events.fatjet.tau2     , "fatjet_tau1"      : events.fatjet.tau1     ,
+        "fatjet_pt_1"       : events.fatjet.pt       ,"fatjet_eta_1"      : events.fatjet.eta      , "fatjet_phi_1": events.fatjet.phi, "fatjet_mass_1": events.fatjet.mass,
+        "fatjet_pt_2"       : events.fatjet.pt       ,"fatjet_eta_2"      : events.fatjet.eta      , "fatjet_phi_2": events.fatjet.phi, "fatjet_mass_2": events.fatjet.mass,
+        "fatjet_tau2_1"     : events.fatjet.tau2     ,"fatjet_tau1_1"     : events.fatjet.tau1     ,
+        "fatjet_tau2_2"     : events.fatjet.tau2     ,"fatjet_tau1_2"     : events.fatjet.tau1     ,
+        "fatjet_msoftdrop_1": events.fatjet.msoftdrop,"fatjet_msoftdrop_2": events.fatjet.msoftdrop,
+        "ht_fatjets"        : events.ht.fatjets
         }
     if ak.backend(events.met.pt) == "typetracer":
         for arr in feature_map.values():
@@ -139,6 +145,8 @@ def eval_ABCD_model(events, nFJ=1, saved_model="best_model.pt"):
             x = ak.to_numpy(feature_map[feature]).astype(np.float32)
         transform = feature_transforms[feature]
         if transform == "log":
+            if feature == "lepton_mass_1" or feature == "lepton_mass_2":
+                print(f"{feature}: {(x < 0).sum()}/{len(x)} negative ({100 * (x < 0).mean():.1f}%), min={x.min(initial=0):.3f}, max={x.max(initial=0):.3f}, mean={x.mean():.3f}, std={x.std():.3f}")
             x = np.log1p(x)
             x = _safe_minmax_scale(x)
         elif transform == "minmax":
@@ -768,7 +776,6 @@ class categorizer(SkimmerABC):
                     / region
                 )
                 skim_path.mkdir(parents=True, exist_ok=True)
-            print("Saving skim to: ", skim_path)
 
             output["skim"][region] = dak.to_parquet(
                 output_array[cut],
