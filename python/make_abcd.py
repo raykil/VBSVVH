@@ -219,9 +219,9 @@ if __name__ == "__main__":
         type=str,
         required=True,
         choices=[
-            "signal-wwh",
-            "signal-zzh-1FJ",
-            "signal-wzh-zzh-2FJ"
+            "signal_wwh",
+            "signal_zzh_1FJ",
+            "signal_wzh_zzh_2FJ"
         ],
     )
     parser.add_argument(

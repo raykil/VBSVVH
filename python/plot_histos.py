@@ -19,19 +19,23 @@ three main types of plots, selectable via the `--plot-type` argument:
 
 Example usage:
 # To plot stacked by process for a single year
-python python/plot_manager.py --year 2022EE --region signal-all --indir histograms/25Aug27 --outdir plots --plot-type process
+python python/plot_histos.py --year 2022EE --region signal-all --indir histograms/25Aug27 --outdir plots --plot-type process
 
 # To plot with flavor breakdown for multiple years combined
-python python/plot_manager.py --year 2022EE 2023 --region signal-all --indir histograms/25Aug27 --outdir plots --plot-type flavor
+python python/plot_histos.py --year 2022EE 2023 --region signal-all --indir histograms/25Aug27 --outdir plots --plot-type flavor
 
 # To plot the QCD shape comparison
-python python/plot_manager.py --year 2022EE --region signal-all --indir histograms/25Aug27 --outdir plots --plot-type qcd_shape --norm-type density
+python python/plot_histos.py --year 2022EE --region signal-all --indir histograms/25Aug27 --outdir plots --plot-type qcd_shape --norm-type density
 """
 from __future__ import annotations
 
 import argparse
 import pickle
 from pathlib import Path
+import os, sys
+
+sys.path.insert(0, f"{os.path.dirname(os.path.abspath(__file__))}/../src")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import hist
 import matplotlib.pyplot as plt
@@ -336,7 +340,8 @@ def main(args):
 
     for year in args.year:
         print(year)
-        pkl_path = Path(args.indir) / f"histograms_{year}_{args.region}.pkl"
+        indir = Path(args.indir or f"histograms/{args.channel}/{year}/{args.region}/pickles")
+        pkl_path = indir / f"histograms_{year}_{args.region}.pkl"
         if not pkl_path.exists():
             print(f"Error: File not found at {pkl_path}. Skipping.")
             continue
@@ -354,10 +359,10 @@ def main(args):
         print("No histograms were loaded. Exiting.")
         return
 
-    output_dir = Path(args.outdir)
+    output_dir = Path(args.outdir or f"histograms/{args.channel}/{year_str}/{args.region}/plots")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    style_path = Path("python/style_hbb.yaml")
+    style_path = Path(__file__).resolve().parent / "style_hbb.yaml"
     with style_path.open() as f:
         style = yaml.safe_load(f)
 
@@ -365,46 +370,31 @@ def main(args):
     if args.plot_type == "process":
         for category in ["pass", "fail"]:
             print(f"Plotting histograms by process for category: {category}, year: {year_str}...")
-            plot_by_process(histograms, category, year_str, args.outdir, args.region, style)
+            plot_by_process(histograms, category, year_str, output_dir, args.region, style)
+
     elif args.plot_type == "flavor":
         for category in ["pass", "fail"]:
             print(f"Plotting histograms by flavor for category: {category}, year: {year_str}...")
-            plot_by_flavor(histograms, category, year_str, args.outdir, args.region, style)
+            plot_by_flavor(histograms, category, year_str, output_dir, args.region, style)
+
     elif args.plot_type == "qcd_shape":
         print(f"Plotting QCD pass/fail shapes for year: {year_str}...")
-        plot_qcd_shapes(histograms, year_str, args.outdir, args.region, args.norm_type)
+        plot_qcd_shapes(histograms, year_str, output_dir, args.region, args.norm_type)
+
     elif args.plot_type == "c2vsignal":
         for category in ["preselection", "preselection_ee", "preselection_mumu", "preselection_emu", "signal_region", "signal_region_ee", "signal_region_mumu", "signal_region_emu"]:
             print(f"Plotting C2V signal shapes for category: {category}, year: {year_str}...")
-            plot_c2vsignal(histograms, category, year_str, args.outdir, args.region, style)
+            plot_c2vsignal(histograms, category, year_str, output_dir, args.region, style)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Unified plotting script for Hbb analysis.")
-    parser.add_argument(
-        "--year",
-        help="List of years",
-        type=str,
-        required=True,
-        nargs="+",
-        choices=["2022", "2022EE", "2023", "2023BPix", "2024", "2016", "2016APV", "2017", "2018"],
-    )
-    parser.add_argument("--indir", help="Input directory for .pkl files", type=str, required=True)
-    parser.add_argument("--outdir", help="Output directory for plots", type=str, required=True)
-    parser.add_argument("--region", help="Analysis region", type=str, required=True)
-    parser.add_argument(
-        "--plot-type",
-        help="Type of plot to produce",
-        type=str,
-        default="c2vsignal",
-        choices=["process", "flavor", "qcd_shape", "c2vsignal"],
-    )
-    parser.add_argument(
-        "--norm-type",
-        help="Normalization for QCD shape plot ('shape' or 'density')",
-        type=str,
-        default="shape",
-        choices=["shape", "density"],
-    )
+    parser.add_argument('-y', "--year"     , type=str, required=True, nargs="+", choices=["2022", "2022EE", "2023", "2023BPix", "2024", "2016", "2016APV", "2017", "2018"])
+    parser.add_argument('-c', "--channel"  , type=str, required=True, choices=["run2_1FJ", "run2_2FJ", "run3_1FJ", "run3_2FJ"])
+    parser.add_argument('-r', "--region"   , type=str, required=True, choices=["signal_wwh", "signal_wzh_zzh_2FJ", "signal_zzh_1FJ"])
+    parser.add_argument('-i', "--indir"    , type=str, default="", help="default: histograms/{channel}/{year}/{region}/pickles")
+    parser.add_argument('-o', "--outdir"   , type=str, default="", help="default: histograms/{channel}/{year}/{region}/plots")
+    parser.add_argument('-p', "--plot-type", type=str, default="c2vsignal", choices=["process", "flavor", "qcd_shape", "c2vsignal"], help="Type of plot to produce")
+    parser.add_argument('-n', "--norm-type", type=str, default="shape", choices=["shape", "density"], help="Normalization for QCD shape plot ('shape' or 'density')")
     args = parser.parse_args()
     main(args)

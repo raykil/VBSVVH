@@ -12,12 +12,12 @@ Run the script specifying the year, region, and an output directory for the `.pk
 
 **Example:**
 ```bash
-python python/make_histos.py --year 2022EE --region signal-wwh --outdir histograms/
+python python/make_histos.py --year 2022EE --region signal_wwh --outdir histograms/
 ```
 ## 2. Plotting from Histograms
 
 
 ```bash
-python python/plot_histos.py --year 2024 --region signal-wwh --indir histograms/25Aug27 --outdir plots/
+python python/plot_histos.py --year 2024 --region signal_wwh --indir histograms/25Aug27 --outdir plots/
 
 ```

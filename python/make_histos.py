@@ -5,6 +5,10 @@ import argparse
 import pickle
 from pathlib import Path
 import json
+import os, sys
+
+sys.path.insert(0, f"{os.path.dirname(os.path.abspath(__file__))}/../src")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import hist
 import numpy as np
@@ -52,29 +56,28 @@ def fill_ptbinned_histogram(events, axis_label, region, dataset, isData=False, d
         deta = data["VBFPair_deta"]
         ll_flav = data["LeadingLep_flavor"]
         sl_flav = data["SubLeadingLep_flavor"]
-        pre_selection = (msd >= 40) & (pt >= 250) # & (mjj > 250) & (deta > 2.5)
-
         all_selections = {
-            "preselection": pre_selection,
-            "hbb_score_0p1": (Txbb > 0.1),
-            "vbf_deta_2p5": (deta > 2.5),
-            "vbf_mjj_250": (mjj > 250),
-            "same_flavor": (ll_flav==sl_flav),
+            "preselection"   : (msd >= 40) & (pt >= 250),
+            "hbb_score_0p1"  : (Txbb > 0.1),
+            "vbf_deta_2p5"   : (deta > 2.5),
+            "vbf_mjj_250"    : (mjj > 250),
+            "same_flavor"    : (ll_flav==sl_flav),
             "opposite_flavor": (ll_flav!=sl_flav),
-            "both_electrons": (ll_flav==sl_flav) & (ll_flav == 1.),
-            "both_muons": (ll_flav==sl_flav) & (ll_flav == 0.)
+            "both_electrons" : (ll_flav==sl_flav) & (ll_flav == 1.),
+            "both_muons"     : (ll_flav==sl_flav) & (ll_flav == 0.)
         }
 
+        # Each key names a category whose events must pass every cut in its list (applied cumulatively, so cutflow records the yield after each cut).
         selection_dict = {
-            "preselection": ["preselection"],
-            "preselection_hbb":["preselection", "hbb_score_0p1"],
-            "preselection_ee": ["preselection", "both_electrons"],
-            "preselection_mumu": ["preselection", "both_muons"],
-            "preselection_emu": ["preselection", "opposite_flavor"],
-            "signal_region": ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250"],
-            "signal_region_ee": ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250", "both_electrons"],
+            "preselection"      : ["preselection"],
+            "preselection_hbb"  : ["preselection", "hbb_score_0p1"],
+            "preselection_ee"   : ["preselection", "both_electrons"],
+            "preselection_mumu" : ["preselection", "both_muons"],
+            "preselection_emu"  : ["preselection", "opposite_flavor"],
+            "signal_region"     : ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250"],
+            "signal_region_ee"  : ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250", "both_electrons"],
             "signal_region_mumu": ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250", "both_muons"],
-            "signal_region_emu": ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250", "opposite_flavor"]
+            "signal_region_emu" : ["preselection", "hbb_score_0p1", "vbf_deta_2p5", "vbf_mjj_250", "opposite_flavor"]
         }
 
         # Fill histograms
@@ -112,16 +115,7 @@ def fill_ptbinned_histogram(events, axis_label, region, dataset, isData=False, d
 def main(args):
     year = args.year
     region = args.region
-    rnfj = args.rnfj
-    MAIN_DIR = "/eos/uscms/store/user/rband/"
-    date = "hvv_26Aug19"
-    paths = {"r21FJ":"merged_2lep_1FJ_r2_2lep_1FJ_20260615211230_2lep_1FJ",
-            "r22FJ":"merged_2lep_2FJ_r2_2lep_2FJ_20260615211710_2lep_2FJ",
-            "r31FJ":"merged_2lep_1FJ_r3_2lep_1FJ_20260615211529_2lep_1FJ",
-            "r32FJ":"merged_2lep_2FJ_r3_2lep_2FJ_20260615211951_2lep_2FJ"
-            }
-
-    path_to_dir = f"{MAIN_DIR}/{date}/{paths[rnfj]}/"
+    path_to_dir = Path(__file__).resolve().parents[1] / f"output_{args.channel}"
 
     load_columns = [
         "weight",
@@ -151,19 +145,18 @@ def main(args):
     }
 
     histograms = {column: {} for column in axis_to_column.keys()}
+    output_dir = Path(args.outdir or f"histograms/{args.channel}/{year}/{region}/pickles")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # --- MAIN LOOP RESTRUCTURED ---
     # Loop through each process
     for process, datasets in samples.items():
-        print(f"Processing {process} for year {year}...")
+        print(f"\n---------- Processing {process} for year {year}... ----------")
 
 
         # Loop through each dataset within the process
         for dataset in datasets:
             # Load only one dataset at a time to save memory
-            search_path = Path(data_dir / dataset / "parquet" / region / "nominal")
-            # print(f"\n[DEBUG] Script is searching for files in: {search_path}\n")
-
             events = utils.load_samples(
                 data_dir,
                 {process: [dataset]},  # Pass a list with a single dataset
@@ -178,22 +171,22 @@ def main(args):
 
             cflow = fill_ptbinned_histogram(
                     events=events, 
-                    axis_label=axis, 
+                    axis_label=axis,
                     region=region,
                     dataset=dataset,
                     isData="_Run20" in dataset,
                     do_cutflow=True
                     )
-            picklename = f"{data_dir}/{dataset}/pickles/postprocessing_cutflow.pkl"
-            cflowfile = open(picklename, 'wb')
-            pickle.dump(cflow, cflowfile, protocol=-1)
+            picklename = output_dir / f"cutflow_{year}_{region}_{dataset}.pkl"
+            with picklename.open("wb") as cflowfile:
+                pickle.dump(cflow, cflowfile, protocol=-1)
 
             for axis in axis_to_column.keys():
                 column = axis_to_column[axis]
                 # Fill the histogram with the events from this single dataset
                 h = fill_ptbinned_histogram(
                     events=events, 
-                    axis_label=axis, 
+                    axis_label=axis,
                     region=region,
                     dataset=dataset,
                     isData="_Run20" in dataset,
@@ -211,8 +204,6 @@ def main(args):
         # --- ADDED CHECK ---
         # Only add the histogram to our dictionary if it has entries
 
-    output_dir = Path(args.outdir)
-    output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f"histograms_{year}_{region}.pkl"
 
     with output_file.open("wb") as f:
@@ -223,34 +214,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Make histograms for a given year.")
-    parser.add_argument(
-        "--year",
-        help="year",
-        type=str,
-        required=True,
-        choices=["2018", "2016", "2016APV", "2017","2022", "2022EE", "2023", "2023BPix", "2024"],
-    )
-    parser.add_argument(
-        "--region",
-        help="region",
-        type=str,
-        required=True,
-        choices=[
-            "signal-wwh",
-            "signal-zzh-1FJ",
-            "signal-wzh-zzh-2FJ"
-        ],
-    )
-    parser.add_argument(
-        "--rnfj",
-        help="Run and FJ configuration",
-        type=str,
-        required=True,
-        choices=["r21FJ", "r22FJ", "r31FJ", "r32FJ"],
-    )
-    parser.add_argument(
-        "--outdir", help="Output directory to save histograms.", type=str, default="histograms"
-    )
+    parser.add_argument('-c', "--channel", type=str, required=True, choices=["run2_1FJ", "run2_2FJ", "run3_1FJ", "run3_2FJ"])
+    parser.add_argument('-y', "--year"   , type=str, required=True, choices=["2016APV", "2016", "2017", "2018", "2022", "2022EE", "2023", "2023BPix", "2024"])
+    parser.add_argument('-r', "--region" , type=str, required=True, choices=["signal_wwh", "signal_wzh_zzh_2FJ", "signal_zzh_1FJ"])
+    parser.add_argument('-o', "--outdir" , type=str, default=""   , help="output directory to save histograms")
     args = parser.parse_args()
 
     main(args)
