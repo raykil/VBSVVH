@@ -100,6 +100,7 @@ def load_samples(
     extra_columns: dict[str] = None,
     filters: list[tuple[str, str, str]] = None,
     variation: str = None,
+    verbose: bool = False,
 ) -> dict[str, pd.DataFrame]:
     """
     Load samples from a specified directory and return them as a dictionary.
@@ -109,6 +110,7 @@ def load_samples(
     :param region: The region to load the parquets from (e.g., "signal-all")
     :param extra_columns: A dictionary where keys are dataset names and values are lists of additional columns to load for that dataset.
     :param filters: A list of filters to apply when loading the datasets.
+    :param verbose: If True, print the raw and weighted entry count of each dataset loaded.
     :return: A dictionary with dataset/sample names as keys and DataFrames as values.
     """
     events_dict = {}
@@ -155,7 +157,8 @@ def load_samples(
 
             # Add the DataFrame to the dictionary with the dataset name as the key
             events_list.append(events)
-            print(f"Loaded {dataset: <35}: {len(events)} entries (weighted: {events['finalWeight'].sum():.2f})")
+            if verbose:
+                print(f"{dataset: <35}: {len(events)} entries (weighted: {events['finalWeight'].sum():.2f})")
 
         # Combine all DataFrames for the process/sample
         # print(events_list)
@@ -163,8 +166,6 @@ def load_samples(
         if events_list:
             events_dict[process] = pd.concat(events_list)
         else:
-            warnings.warn(
-                f"No valid events loaded for process {process}.", category=UserWarning, stacklevel=2
-            )
+            warnings.warn(f"No valid events loaded for process {process}.", category=UserWarning, stacklevel=2)
 
     return events_dict

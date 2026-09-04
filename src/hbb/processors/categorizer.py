@@ -6,19 +6,15 @@ from pathlib import Path
 import awkward as ak
 import dask_awkward as dak
 import numpy as np
-# import xgboost as xgb
 from coffea.analysis_tools import PackedSelection, Weights
-# from coffea.ml_tools import xgboost_wrapper
 from hist.dask import Hist
 from sklearn.preprocessing import MinMaxScaler
 
 from hbb.processors.SkimmerABC import SkimmerABC
-
 from .GenSelection import (bosonFlavor, gen_selection_Hbb, gen_selection_V, gen_selection_Vg, getBosons)
-from .objects import (good_ak4jets, good_ak8jets, good_electrons, loose_muons, highpt_muons, set_ak4jets, set_ak8jets)
+from .objects import *
 from .abcd_model import *
 logger = logging.getLogger(__name__)
-
 
 def update(events, collections):
     """Return a shallow copy of events array with some collections swapped out"""
@@ -26,7 +22,6 @@ def update(events, collections):
     for name, value in collections.items():
         out = ak.with_field(out, value, name)
     return out
-
 
 # mapping samples to the appropriate function for doing gen-level selections
 gen_selection_dict = {
@@ -163,9 +158,11 @@ def eval_ABCD_model(events, nFJ=1, saved_model="best_model.pt"):
 #    scores = dak.from_awkward(ak.Array(scores), npartitions)
 #    print(scores)
     return scores
+
 def add_abcd_score(events, nFJ=1, saved_model="best_model.pt"):
     score = eval_ABCD_model(events, nFJ, saved_model)
     return ak.with_field(events, ak.Array(score), "ABCD_score")
+
 model_file = {}
 model_file["2022"] = {}
 model_file["2023"] = {}
@@ -175,7 +172,6 @@ model_file["2016APV"] = {}
 model_file["2016"] = {}
 model_file["2017"] = {}
 model_file["2018"] = {}
-
 
 model_file["2022"]["1"] = "src/hbb/data/run3_2L_1FJ_best_model.pt"
 model_file["2022"]["2"] = "src/hbb/data/run3_2L_2FJ_best_model.pt"
@@ -251,13 +247,8 @@ class categorizer(SkimmerABC):
         )
 
     def process(self, events):
-
         # process only nominal case
-        meta = ak.with_field(
-            events._meta,
-            np.array([], dtype=np.float32),
-            "ABCD_score"
-        )
+        meta = ak.with_field(events._meta, np.array([], dtype=np.float32), "ABCD_score")
         events = dak.map_partitions(add_abcd_score, events, self._nFJ, model_file[self._year][str(self._nFJ)], meta=meta)
         if self._skip_syst or not self._save_skim or not hasattr(events, "genWeight"):
             return {"nominal": self.process_shift(events, "nominal")}
@@ -267,9 +258,7 @@ class categorizer(SkimmerABC):
         Muon Energy: `MuonPTScale and MuonPTResolution` defined in mupt_variations
         Jet Energy: `JES, JER, UES` defined in jerc_variations
         """
-        total_variations = (
-            ["nominal"]
-        )
+        total_variations = (["nominal"])
 
         """
         run processor for each shift defined in total_variations
@@ -281,11 +270,9 @@ class categorizer(SkimmerABC):
         """
         Add weights that are not region specific
         """
-
-        # print(events.weight)
-
         weights.add("genweight", events.baseweight / events.xsecweight )
 
+        # for systematics...
         # if not self._skip_syst:
         #     weights.add("pileup", events.weight.pileup[0], events.weight.pileup[1], events.weight.pileup[2])
         #     weights.add("ISRPartonShower", events.weight_PSISR[0], events.weight_PSISR[1], events.weight_PSISR[2])
@@ -306,25 +293,19 @@ class categorizer(SkimmerABC):
 
         return
 
-    def add_region_weights(
-        self, region, weights, events, btag_jets=None, muons=None, muon_type="", photons=None
-        ):
+    def add_region_weights(self, region, weights, events, btag_jets=None, muons=None, muon_type="", photons=None):
         """
         Add weights that are region specific, depending on objects queried.
         Weights will be differentiated by "REGION{region}_" , which will be used for sorting in the partial_weight call
+        260903 Raymond comment: We need btagSF in MC since I apply event-level medium b-tag veto (selection.add("antiak4btagMedium", nb_veto == 0)).
         """
-
-        weight_str = f"REGION{region}_"
-
         btag_SF = ak.ones_like(events.run)
         # if not self._skip_syst:
-
+            # weight_str = f"REGION{region}_"
             # if not self._btag_eff and btag_jets is not None:
             #     btag_SF = add_btag_weights(
             #         weights, btag_jets, self._btagger, self._btag_wp, self._year, alt_str=weight_str
             #     )
-
-
         return btag_SF
 
     def get_weight_dict(self, region, weights, events, dataset) -> tuple[dict, dict]:
@@ -422,7 +403,7 @@ class categorizer(SkimmerABC):
         all_leps = ak.concatenate([goodmuons, goodelectrons], axis=1)
         all_leps = ak.with_name(all_leps, "PtEtaPhiMLorentzVector")
         leps_ordered = all_leps[ak.argsort(all_leps.pt, axis=1, ascending=False)]
-        leadinglep = ak.firsts(leps_ordered[:, 0:1])
+        leadinglep    = ak.firsts(leps_ordered[:, 0:1])
         subleadinglep = ak.firsts(leps_ordered[:, 1:2])
         lep_mass = (leadinglep + subleadinglep).mass
 
@@ -477,11 +458,10 @@ class categorizer(SkimmerABC):
         dR_V_pass = ak.fill_none(dR_V_pass, True)
         ak4_outside_ak8 = goodjets[(dR > 0.8)]
         ak4_medb_outside_ak8 = ak4_outside_ak8[ak4_outside_ak8.isMediumBTag]
-        nb_veto = ak.num(ak4_medb_outside_ak8, axis=1)
+        nb_veto = ak.num(ak4_medb_outside_ak8, axis=1) # ak4_medb_outside_ak8 = (good AK4 jets) & (ΔR > 0.8 separated from H-cand AK8 jet) & (pass medium btagWP). b-jet that is not absorbed to Higgs-AK8 jet.
         
-
-        #AK4 b-jet vetos
-        selection.add("antiak4btagMedium", nb_veto == 0)
+        # AK4 b-jet vetos
+        selection.add("antiak4btagMedium", nb_veto == 0) # event-level cut. Removes if there is at least 1 b-jet not in Higgs-AK8 jet.
         selection.add("ak4btagMedium08", nb_veto > 0)
 
         # ---- VBF Jets ----
@@ -548,6 +528,7 @@ class categorizer(SkimmerABC):
         # msd_matched = candidatejet.msd * (genflavor > 0) + candidatejet.msd * (genflavor == 0)
         msd_matched = candidatejet.msd
 
+        # values are the cuts that events must pass to land in the region (order kind of matters, looking into cutflow)
         regions = {
             "signal_wwh": [
                 # "trigger",
@@ -561,7 +542,6 @@ class categorizer(SkimmerABC):
                 "antiak4btagMedium",
                 "2ak4s",
                 # "isvbf",
-
             ],
             "signal_zzh_1FJ": [
                 # "trigger",
@@ -591,6 +571,11 @@ class categorizer(SkimmerABC):
                 # "isvbf",
             ],
         }
+        # regions = {
+        #     "signal_wwh"        : ["twoleptons", "oppsign", "lepdR", "antiak4btagMedium", "2ak4s", "onegoodAK8", "notZpeak"],              # ["trigger", "ak4jetveto", "highmet", "isvbf"]
+        #     "signal_zzh_1FJ"    : ["twoleptons", "oppsign", "lepdR", "antiak4btagMedium", "2ak4s", "onegoodAK8", "inZpeak", "sameflavor"], # ["trigger", "ak4jetveto", "highmet", "isvbf"]
+        #     "signal_wzh_zzh_2FJ": ["twoleptons", "oppsign", "lepdR", "antiak4btagMedium", "2ak4s", "twogoodAK8", "inZpeak", "sameflavor"], # ["trigger", "ak4jetveto", "isvbf"]
+        # }
 
         btag_eff_cuts = [
             # "trigger",
@@ -701,28 +686,28 @@ class categorizer(SkimmerABC):
                 "genWeight": gen_weight,
             }
 
-            if "v12" not in self._nano_version:
+            if "v12" not in self._nano_version: # if not v12, add parT variables
                 parT_array = {
-                    "HiggsAK8_ParTPQCD": candidatejet.ParTPQCD,
-                    "HiggsAK8_ParTPXbb": candidatejet.ParTPXbb,
-                    "HiggsAK8_ParTPXcc": candidatejet.ParTPXcc,
-                    "HiggsAK8_ParTPXqq": candidatejet.ParTPXqq,
-                    "HiggsAK8_ParTPXcs": candidatejet.ParTPXcs,
-                    "HiggsAK8_ParTPXbbVsQCD": candidatejet.ParTPXbbVsQCD,
-                    "HiggsAK8_ParTPXccVsQCD": candidatejet.ParTPXccVsQCD,
-                    "HiggsAK8_ParTPXbbXcc": candidatejet.ParTPXbbXcc,
+                    "HiggsAK8_ParTPQCD"       : candidatejet.ParTPQCD,
+                    "HiggsAK8_ParTPXbb"       : candidatejet.ParTPXbb,
+                    "HiggsAK8_ParTPXcc"       : candidatejet.ParTPXcc,
+                    "HiggsAK8_ParTPXqq"       : candidatejet.ParTPXqq,
+                    "HiggsAK8_ParTPXcs"       : candidatejet.ParTPXcs,
+                    "HiggsAK8_ParTPXbbVsQCD"  : candidatejet.ParTPXbbVsQCD,
+                    "HiggsAK8_ParTPXccVsQCD"  : candidatejet.ParTPXccVsQCD,
+                    "HiggsAK8_ParTPXbbXcc"    : candidatejet.ParTPXbbXcc,
                     "HiggsAK8_ParTmassGeneric": candidatejet.ParTmassGeneric,
-                    "HiggsAK8_ParTmassX2p": candidatejet.ParTmassX2p,
-                    "VAK8_ParTPQCD": candidateVjet.ParTPQCD,
-                    "VAK8_ParTPXbb": candidateVjet.ParTPXbb,
-                    "VAK8_ParTPXcc": candidateVjet.ParTPXcc,
-                    "VAK8_ParTPXqq": candidateVjet.ParTPXqq,
-                    "VAK8_ParTPXcs": candidateVjet.ParTPXcs,
-                    "VAK8_ParTPXbbVsQCD": candidateVjet.ParTPXbbVsQCD,
-                    "VAK8_ParTPXccVsQCD": candidateVjet.ParTPXccVsQCD,
-                    "VAK8_ParTPXbbXcc": candidateVjet.ParTPXbbXcc,
-                    "VAK8_ParTmassGeneric": candidateVjet.ParTmassGeneric,
-                    "VAK8_ParTmassX2p": candidateVjet.ParTmassX2p
+                    "HiggsAK8_ParTmassX2p"    : candidatejet.ParTmassX2p,
+                    "VAK8_ParTPQCD"           : candidateVjet.ParTPQCD,
+                    "VAK8_ParTPXbb"           : candidateVjet.ParTPXbb,
+                    "VAK8_ParTPXcc"           : candidateVjet.ParTPXcc,
+                    "VAK8_ParTPXqq"           : candidateVjet.ParTPXqq,
+                    "VAK8_ParTPXcs"           : candidateVjet.ParTPXcs,
+                    "VAK8_ParTPXbbVsQCD"      : candidateVjet.ParTPXbbVsQCD,
+                    "VAK8_ParTPXccVsQCD"      : candidateVjet.ParTPXccVsQCD,
+                    "VAK8_ParTPXbbXcc"        : candidateVjet.ParTPXbbXcc,
+                    "VAK8_ParTmassGeneric"    : candidateVjet.ParTmassGeneric,
+                    "VAK8_ParTmassX2p"        : candidateVjet.ParTmassX2p
                 }
                 output_array = {**output_array, **parT_array}
 
@@ -758,6 +743,7 @@ class categorizer(SkimmerABC):
             }
 
         def skim(region, output_array):
+            """Writes output['skim'][region], and fills output['cutfow'] and output[btagWeight]"""
             selections = regions[region]
             cut = selection.all(*selections)
 
@@ -768,23 +754,11 @@ class categorizer(SkimmerABC):
             if "root:" in self._skim_outpath:
                 skim_path = f"{self._skim_outpath}/{shift_name.replace('_', '')}/{self._year}/{dataset}/{region}"
             else:
-                skim_path = (
-                    Path(self._skim_outpath)
-                    / shift_name.replace("_", "")
-                    / self._year
-                    / dataset
-                    / region
-                )
+                skim_path = Path(self._skim_outpath, shift_name.replace("_", ""), self._year, dataset, region)
                 skim_path.mkdir(parents=True, exist_ok=True)
-
-            output["skim"][region] = dak.to_parquet(
-                output_array[cut],
-                str(skim_path),
-                compute=False,
-            )
+            output["skim"][region] = dak.to_parquet(output_array[cut], str(skim_path), compute=False)
 
             if shift_name == "nominal":
-
                 # Fill cutflow hist
                 allcuts = set()
                 cut = selection.all(*allcuts)
@@ -817,10 +791,7 @@ class categorizer(SkimmerABC):
             else:  # energy variation shift case
                 for region in regions:
                     if "signal" in region:
-                        skim(
-                            region,
-                            ak.zip({**energy_var_array, **weights_dict}, depth_limit=1),
-                        )
+                        skim(region, ak.zip({**energy_var_array, **weights_dict}, depth_limit=1))
 
         toc = time.time()
         output["filltime"] = toc - tic

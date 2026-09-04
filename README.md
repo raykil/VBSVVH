@@ -107,5 +107,6 @@ python inspect_cutflow.py -c $channel -y $year -r $region
 
 ### 3. Draw histograms
 ```bash
+# STEP 3
 python python/plot_histos.py
 ```

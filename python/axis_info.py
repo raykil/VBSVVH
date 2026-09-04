@@ -2,6 +2,7 @@ import hist
 
 
 #axis labels associated columns
+# values: columns in pd dataframe
 axis_to_column = {
     "pt1"       : "HiggsAK8_pt",
     "msd1"      : "HiggsAK8_msdmatched",
@@ -12,7 +13,7 @@ axis_to_column = {
     "met"       : "MET",
     "pt3"       : "LeadingLep_pt",
     "pt4"       : "SubLeadingLep_pt",
-    "lepmass"   : "LepPair_mass",
+    "lepmass"   : "LepPair_mass", # two mapping to same thing?
     "lepmass2"  : "LepPair_mass",
     "vbs_score" : "VBFPair_score",
     "abcd_score": "ABCD_score"

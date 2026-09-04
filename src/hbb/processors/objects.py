@@ -1,19 +1,9 @@
 from __future__ import annotations
-
 import awkward as ak
 import numpy as np
-from coffea.nanoevents.methods.nanoaod import (
-    ElectronArray,
-    FatJetArray,
-    JetArray,
-    MuonArray,
-    PhotonArray,
-)
+from coffea.nanoevents.methods.nanoaod import (ElectronArray, FatJetArray, JetArray, MuonArray, PhotonArray)
 
-
-def trig_match_sel(
-    events, objects, trig_objects, year, trigger, filterbit, ptcut, HLTs, trig_dR=0.2
-):
+def trig_match_sel(events, objects, trig_objects, year, trigger, filterbit, ptcut, HLTs, trig_dR=0.2):
     """
     Returns selection for objects which are trigger matched to the specified trigger.
     """
@@ -29,13 +19,11 @@ def trig_match_sel(
     trig_obj_sel = trig_fired & trig_obj_matched & (objects.pt > ptcut)
     return trig_obj_sel
 
-
 def good_photons(photons: PhotonArray):
 
     sel = (photons.pt > 15) & (photons.isScEtaEB | photons.isScEtaEE) & (photons.mvaID_WP80)
 
     return photons[sel]
-
 
 def tight_photons(photons: PhotonArray):
 
@@ -43,49 +31,30 @@ def tight_photons(photons: PhotonArray):
 
     return photons[sel]
 
-
 def loose_muons(muons: MuonArray, pt_type):
     sel = (
-        (getattr(muons, pt_type) > 10)
-        & (np.abs(muons.eta) < 2.4)
-        & (muons.looseId)
-        & (muons.pfRelIso04_all < 0.15)
-        & (
-            ((abs(muons.eta) < 1.479) & (abs(muons.dz) < 0.1) & (abs(muons.dxy) < 0.05))
-            | ((abs(muons.eta) >= 1.479) & (abs(muons.dz) < 0.2) & (abs(muons.dxy) < 0.1))
-        )
+        (getattr(muons, pt_type) > 10) & (np.abs(muons.eta) < 2.4) & (muons.looseId) & (muons.pfRelIso04_all < 0.15) & 
+        (((abs(muons.eta) < 1.479 ) & (abs(muons.dz) < 0.1) & (abs(muons.dxy) < 0.05)) |
+         ((abs(muons.eta) >= 1.479) & (abs(muons.dz) < 0.2) & (abs(muons.dxy) < 0.1 )))
     )
     return muons[sel]
 
 def highpt_muons(muons: MuonArray, pt_type):
-    
     loosemuons = loose_muons(muons, pt_type)
-
     sel = (
-        (getattr(loosemuons, pt_type) > 30)
-        & (loosemuons.tightId) #1=pass tracker highPtId, 2=pass global highPtId
+        (getattr(loosemuons, pt_type) > 30) & 
+        (loosemuons.tightId) #1=pass tracker highPtId, 2=pass global highPtId
         # & (loosemuons.isGlobal)
     )
     return loosemuons[sel]
 
-
 def good_electrons(electrons: ElectronArray):
     sel = (
-        (electrons.pt > 10)
-        & (abs(electrons.eta) < 2.5)
-        & (electrons.pfRelIso03_all < 0.15)
-        & (electrons.mvaNoIso_WP90)
-        & (
-            ((abs(electrons.eta) < 1.479) & (abs(electrons.dz) < 0.1) & (abs(electrons.dxy) < 0.05))
-            | (
-                (abs(electrons.eta) >= 1.479)
-                & (abs(electrons.dz) < 0.2)
-                & (abs(electrons.dxy) < 0.1)
-            )
-        )
+        (electrons.pt > 10) & (abs(electrons.eta) < 2.5) & (electrons.pfRelIso03_all < 0.15) & (electrons.mvaNoIso_WP90) & 
+        (((abs(electrons.eta) < 1.479 ) & (abs(electrons.dz) < 0.1) & (abs(electrons.dxy) < 0.05)) |
+         ((abs(electrons.eta) >= 1.479) & (abs(electrons.dz) < 0.2) & (abs(electrons.dxy) < 0.1)))
     )
     return electrons[sel]
-
 
 def set_ak4jets(jets: JetArray, isRealData: bool, year: str, nano_version: str, event_rho=None):
     """
@@ -108,27 +77,21 @@ def set_ak4jets(jets: JetArray, isRealData: bool, year: str, nano_version: str, 
 
     return jets
 
-
-# ak4 jet definition
 def good_ak4jets(jets: JetArray):
+    # ak4 jet definition
     # Since the main AK4 collection for Run3 is the AK4 Puppi collection, jets originating from pileup are already suppressed at the jet clustering level
     # PuID might only be needed for forward region (WIP)
-
     # JETID: https://twiki.cern.ch/twiki/bin/viewauth/CMS/JetID13p6TeV
     sel = (
-        (jets.pt > 30)
-        & (jets.jetidtight)
-        & (jets.jetidtightlepveto)
-        & (abs(jets.eta) < 5.0)
-        & ~((jets.pt <= 50) & (abs(jets.eta) > 2.5) & (abs(jets.eta) < 3.0))
+        (jets.pt > 30) &
+        (jets.jetidtight) &
+        (jets.jetidtightlepveto) &
+        (abs(jets.eta) < 5.0) &
+        ~((jets.pt <= 50) & (abs(jets.eta) > 2.5) & (abs(jets.eta) < 3.0)) # What is it for?
     )
-
     return jets[sel]
 
-
 def set_ak8jets(fatjets: FatJetArray, isRealData: bool, year: str, nano_version: str, event_rho=None):
-
-
     if "v12" in nano_version:
         fatjets["jetidtight"] = fatjets.isTight
     else:
@@ -140,30 +103,18 @@ def set_ak8jets(fatjets: FatJetArray, isRealData: bool, year: str, nano_version:
         fatjets["ParTPXcs"] = fatjets.globalParT3_Xcs
         fatjets["ParTPXqq"] = fatjets.globalParT3_Xqq
 
-        fatjets["ParTPXbbVsQCD"] = fatjets.globalParT3_Xbb / (
-            fatjets.globalParT3_Xbb + fatjets.globalParT3_QCD
-        )
-        fatjets["ParTPXccVsQCD"] = fatjets.globalParT3_Xcc / (
-            fatjets.globalParT3_Xcc + fatjets.globalParT3_QCD
-        )
-        fatjets["ParTPXbbXcc"] = (fatjets.globalParT3_Xbb + fatjets.globalParT3_Xcc) / (
-            fatjets.globalParT3_Xbb + fatjets.globalParT3_Xcc + fatjets.globalParT3_QCD
-        )
+        fatjets["ParTPXbbVsQCD"] = fatjets.globalParT3_Xbb / (fatjets.globalParT3_Xbb + fatjets.globalParT3_QCD)
+        fatjets["ParTPXccVsQCD"] = fatjets.globalParT3_Xcc / (fatjets.globalParT3_Xcc + fatjets.globalParT3_QCD)
+        fatjets["ParTPXbbXcc"] = (fatjets.globalParT3_Xbb + fatjets.globalParT3_Xcc) / (fatjets.globalParT3_Xbb + fatjets.globalParT3_Xcc + fatjets.globalParT3_QCD)
 
         # ParT masses were trained with the masses WITHOUT the jet mass correction, so we have to undo the correction here
-        fatjets["ParTmassGeneric"] = (
-            fatjets.globalParT3_massCorrGeneric * (1 - fatjets.rawFactor) * fatjets.mass
-        )
-        fatjets["ParTmassX2p"] = (
-            fatjets.globalParT3_massCorrX2p * (1 - fatjets.rawFactor) * fatjets.mass
-        )
+        fatjets["ParTmassGeneric"] = (fatjets.globalParT3_massCorrGeneric * (1 - fatjets.rawFactor) * fatjets.mass)
+        fatjets["ParTmassX2p"] = (fatjets.globalParT3_massCorrX2p * (1 - fatjets.rawFactor) * fatjets.mass)
 
     fatjets["msd"] = fatjets.msoftdrop
     fatjets["qcdrho"] = 2 * np.log(fatjets.msd / fatjets.pt)
     fatjets["pnetmass"] = fatjets.particleNet_massCorr * fatjets.mass
-    fatjets["pnetXbbXcc"] = (fatjets.particleNet_XbbVsQCD + fatjets.particleNet_XccVsQCD) / (
-        fatjets.particleNet_XbbVsQCD + fatjets.particleNet_XccVsQCD + fatjets.particleNet_QCD
-    )
+    fatjets["pnetXbbXcc"] = (fatjets.particleNet_XbbVsQCD + fatjets.particleNet_XccVsQCD) / (fatjets.particleNet_XbbVsQCD + fatjets.particleNet_XccVsQCD + fatjets.particleNet_QCD)
 
     if event_rho is not None:
         # jerc variables
@@ -174,9 +125,7 @@ def set_ak8jets(fatjets: FatJetArray, isRealData: bool, year: str, nano_version:
             fatjets["pt_gen"] = ak.values_astype(ak.fill_none(fatjets.matched_gen.pt, 0), np.float32)
     return fatjets
 
-
-# ak8 jet definition
 def good_ak8jets(fatjets: FatJetArray):
-    sel = fatjets.jetidtight & (fatjets.pt > 200) & (abs(fatjets.eta) < 2.5)
-    # sel = (fatjets.pt > 200) & (abs(fatjets.eta) < 2.5)
+    # ak8 jet definition
+    sel = fatjets.jetidtight & (fatjets.pt > 200) & (abs(fatjets.eta) < 2.5) # sel = (fatjets.pt > 200) & (abs(fatjets.eta) < 2.5)
     return fatjets[sel]

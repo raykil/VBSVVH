@@ -30,7 +30,6 @@ def sci_2_before_decimal(x):
     
     return f"{mantissa:.2f}e{exp:+03d}"
 
-
 def extract_mergemap(style):
     """
     Extracts the merge map from the style dictionary.
@@ -39,7 +38,6 @@ def extract_mergemap(style):
         key for key in style if "contains" in style[key] and style[key]["contains"] is not None
     ]
     return {key: style[key]["contains"] for key in compound_keys}
-
 
 def merge_hists(hist_dict, merge_map):
     """
@@ -66,7 +64,6 @@ def merge_hists(hist_dict, merge_map):
         # else:
         #     warnings.warn(f"  No histograms available for merge {v} -> '{k}'.", stacklevel=2)
     return hist_dict
-
 
 def format_legend(ax, ncols=2, handles_labels=None, title=None, **kwargs):
     if handles_labels is None:
@@ -100,7 +97,6 @@ def format_legend(ax, ncols=2, handles_labels=None, title=None, **kwargs):
     leg1._legend_box._children.append(leg2._legend_handle_box)
     leg1._legend_box.stale = True
     return leg1
-
 
 def ratio_plot(
     hist_dict: dict[hist.Hist],
@@ -144,11 +140,11 @@ def ratio_plot(
     if(sum(tot_bkg.values()) == 0):
         return fig, (ax, rax)
     
-    print("----------------------")
-    print("TOTBKG", sum(tot_bkg.values()), tot_bkg.variances())
-    for sig in sigs:
-        print(sig, sum(hist_dict[sig].values()), hist_dict[sig].variances())
-    print("----------------------")
+    # print("----------------------")
+    # print("TOTBKG", sum(tot_bkg.values()), tot_bkg.variances())
+    # for sig in sigs:
+    #     print(sig, sum(hist_dict[sig].values()), hist_dict[sig].variances())
+    # print("----------------------")
 
     if onto is None:
         hep.histplot(
@@ -269,7 +265,9 @@ def ratio_plot(
     labels= [f"{i}: {sci_2_before_decimal(sum((hist_dict['data']).values()))}" 
               if "Data" == i else i
               for i in labels_sig]
-    _legend_fontsize = "small" if len(labels) <= 8 else "x-small"
+    # shrink so neither the entry count nor the longest label overflows the two columns
+    _longest = max((len(line) for lab in labels for line in lab.split("\n")), default=0)
+    _legend_fontsize = "small" if len(labels) <= 8 and _longest <= 26 else "x-small" if _longest <= 34 else "xx-small"
     _ = format_legend(
         ax,
         ncols=2,
@@ -421,7 +419,9 @@ def c2vonly_plot(
     handles, labels = ax.get_legend_handles_labels()
     handles = [handles[i] for i in order]
     labels = [style[labels[i]]["label"] for i in order]
-    _legend_fontsize = "small" if len(labels) <= 8 else "x-small"
+    # shrink so neither the entry count nor the longest label overflows the two columns
+    _longest = max((len(line) for lab in labels for line in lab.split("\n")), default=0)
+    _legend_fontsize = "small" if len(labels) <= 8 and _longest <= 26 else "x-small" if _longest <= 34 else "xx-small"
     _ = format_legend(
         ax,
         ncols=2,

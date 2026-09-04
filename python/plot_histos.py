@@ -38,6 +38,7 @@ sys.path.insert(0, f"{os.path.dirname(os.path.abspath(__file__))}/../src")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import hist
+import matplotlib
 import matplotlib.pyplot as plt
 import mplhep as hep
 import yaml
@@ -114,14 +115,13 @@ def plot_by_process(hists, category, year_str, outdir, region, style):
         fig.savefig(output_name, dpi=300, bbox_inches="tight")
         plt.close(fig)
 
-def plot_c2vsignal(hists, category, year_str, outdir, region, style):
+def plot_c2vsignal(hists, category, year_str, outdir, region, style, variables, channel, verbose=False):
     """Plots a stacked histogram for each pt bin, with grouping handled by the style file."""
 
-    first_hist = next(iter(hists.values()))
-
     # Project all raw histograms to 1D for this pt bin
-    histograms_to_plot = {}
-    for axis_label in hists.keys():
+    for axis_label in variables:
+        histograms_to_plot = {}
+        print(f"\033[1m\n————— channel:{channel} | category:{category} | year(s):{year_str} | var:{axis_to_column[axis_label]} | region:{region} ———————————————\033[0m")
         for process, h in hists[axis_label].items():
             column = axis_to_column[axis_label]
             if not category in h.axes[1]:
@@ -131,7 +131,11 @@ def plot_c2vsignal(hists, category, year_str, outdir, region, style):
             # if not "c2v" in process:
             #     continue
             histograms_to_plot[process] = h_proj
-            print(process, h_proj.values().sum())
+            if verbose: print(f"  {process:<25}: {h_proj.values().sum():.2f}")
+
+        if not histograms_to_plot:
+            print(f"\033[1;38;5;208m  No events! Skipping...\033[0m")
+            continue
 
         # Define the lists of signals and backgrounds using the final group names
         # These names must have a corresponding entry in the style file with a 'contains' key
@@ -162,10 +166,17 @@ def plot_c2vsignal(hists, category, year_str, outdir, region, style):
             year=year_str,
         )
 
+        fig.canvas.draw() # legend extent is only known once the figure is laid out
+        legends = [c for c in ax.get_children() if isinstance(c, matplotlib.legend.Legend)] # format_legend detaches ax.get_legend() when the entry count is odd
+        boxes = [l.get_window_extent().transformed(ax.transAxes.inverted()) for l in legends]
+        x_legend, y_legend = (min(b.x0 for b in boxes), max(b.y1 for b in boxes)) if boxes else (1.0, 1.0)
+        ax.text(x_legend - 0.02, y_legend, f"{region}\n{category}", transform=ax.transAxes, ha="right", va="top", color="gray", fontsize=14)
+
         f_outdir = Path(f"{outdir}/{category}")
         f_outdir.mkdir(parents=True, exist_ok=True)
-        output_name = f"{f_outdir}/{year_str}_{region}_{category}_process_{axis_label}_{column}.png"
+        output_name = f"{f_outdir}/{column}{'2' if axis_label == 'lepmass2' else ''}.png" # lepmass/lepmass2 share a column
         fig.savefig(output_name, dpi=300, bbox_inches="tight")
+        print(f"\033[1;32m{output_name} saved!\033[0m")
         plt.close(fig)
 
 # --- Function 2: Plotting Stacked by Flavor ---
@@ -339,7 +350,6 @@ def main(args):
     year_str = "-".join(args.year)
 
     for year in args.year:
-        print(year)
         indir = Path(args.indir or f"histograms/{args.channel}/{year}/{args.region}/pickles")
         pkl_path = indir / f"histograms_{year}_{args.region}.pkl"
         if not pkl_path.exists():
@@ -348,18 +358,19 @@ def main(args):
         with pkl_path.open("rb") as f:
             histograms_tmp = pickle.load(f)
             for axis in histograms_tmp:
-                histograms[axis] = {}
+                histograms.setdefault(axis, {}) # handling multiple years
                 for process, h in histograms_tmp[axis].items():
                     if process in histograms[axis]:
                         histograms[axis][process] += h
                     else:
                         histograms[axis][process] = h
 
-    if not histograms:
-        print("No histograms were loaded. Exiting.")
-        return
+    # if not histograms:
+    #     print("No histograms were loaded. Exiting.")
+    #     return
 
-    output_dir = Path(args.outdir or f"histograms/{args.channel}/{year_str}/{args.region}/plots")
+    dir_label = "run2_inclusive" if set(args.year) == {"2016APV", "2016", "2017", "2018"} else year_str
+    output_dir = Path(args.outdir or f"histograms/{args.channel}/{dir_label}/{args.region}/plots")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     style_path = Path(__file__).resolve().parent / "style_hbb.yaml"
@@ -382,18 +393,21 @@ def main(args):
         plot_qcd_shapes(histograms, year_str, output_dir, args.region, args.norm_type)
 
     elif args.plot_type == "c2vsignal":
-        for category in ["preselection", "preselection_ee", "preselection_mumu", "preselection_emu", "signal_region", "signal_region_ee", "signal_region_mumu", "signal_region_emu"]:
-            print(f"Plotting C2V signal shapes for category: {category}, year: {year_str}...")
-            plot_c2vsignal(histograms, category, year_str, output_dir, args.region, style)
+        categories = ["preselection", "preselection_ee", "preselection_mumu", "preselection_emu", "preselection_hbb", "signal_region", "signal_region_ee", "signal_region_mumu", "signal_region_emu"]
+        # categories = ["preselection"]
+        for category in categories:
+            # print(f"\033[1m\n————— type:{args.plot_type} | category:{category} | year(s):{year_str} |  ———————————————\033[0m")
+            plot_c2vsignal(histograms, category, year_str, output_dir, args.region, style, args.variable, args.channel)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Unified plotting script for Hbb analysis.")
-    parser.add_argument('-y', "--year"     , type=str, required=True, nargs="+", choices=["2022", "2022EE", "2023", "2023BPix", "2024", "2016", "2016APV", "2017", "2018"])
+    parser.add_argument('-y', "--year"     , type=str, required=True, nargs="+", choices=["2022", "2022EE", "2023", "2023BPix", "2024", "2016", "2016APV", "2017", "2018"], help='space-separated like: -y 2016APV 2016 2017 2018')
     parser.add_argument('-c', "--channel"  , type=str, required=True, choices=["run2_1FJ", "run2_2FJ", "run3_1FJ", "run3_2FJ"])
     parser.add_argument('-r', "--region"   , type=str, required=True, choices=["signal_wwh", "signal_wzh_zzh_2FJ", "signal_zzh_1FJ"])
     parser.add_argument('-i', "--indir"    , type=str, default="", help="default: histograms/{channel}/{year}/{region}/pickles")
     parser.add_argument('-o', "--outdir"   , type=str, default="", help="default: histograms/{channel}/{year}/{region}/plots")
+    parser.add_argument('-v', "--variable" , type=str, nargs="+", default=["abcd_score"], choices=list(axis_to_column), help="keys of axis_to_column in python/axis_info.py")
     parser.add_argument('-p', "--plot-type", type=str, default="c2vsignal", choices=["process", "flavor", "qcd_shape", "c2vsignal"], help="Type of plot to produce")
     parser.add_argument('-n', "--norm-type", type=str, default="shape", choices=["shape", "density"], help="Normalization for QCD shape plot ('shape' or 'density')")
     args = parser.parse_args()
