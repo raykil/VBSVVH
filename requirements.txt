@@ -2,6 +2,8 @@ awkward
 click
 coffea==2025.1.1
 colorama
+conda-pack
+# ndcctools (TaskVine) is conda-forge only: conda install -c conda-forge ndcctools
 correctionlib
 dask-awkward==2025.5.0
 hist
@@ -15,7 +17,9 @@ PyYAML
 rhalphalib
 scikit-learn
 scipy
-torch
+# CPU-only torch: workers just run ABCD inference, and the CUDA wheels add ~6 GB to the poncho env.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.13.0+cpu
 vector
 xgboost>=2.0.3
 XRootD
