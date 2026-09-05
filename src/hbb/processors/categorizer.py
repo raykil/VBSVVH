@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import time, json, torch, logging
 from pathlib import Path
 
@@ -374,8 +372,8 @@ class categorizer(SkimmerABC):
         # selection.add("trigger", trigger)
         # del trigger
 
-        fatjets = set_ak8jets(events.fatjet, self._isData, self._year, self._nano_version)
-        jets = set_ak4jets(events.jet, self._isData, self._year, self._nano_version)
+        fatjets = set_ak8jets(events.fatjet, self._isData, self._nano_version)
+        jets = set_ak4jets(events.jet, self._isData, self._nano_version)
 
         met = events.met
 

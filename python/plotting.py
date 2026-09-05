@@ -3,7 +3,6 @@ Plotting functions based on https://github.com/andrzejnovak/combine_postfits
 by Andrzej Novak
 """
 
-from __future__ import annotations
 
 import warnings
 

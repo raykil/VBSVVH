@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 DATA_SAMPLES = ["JetMET", "Muon", "ParkingHH", "ParkingSingleMuon", "ParkingVBF"]
 
 LUMI = {

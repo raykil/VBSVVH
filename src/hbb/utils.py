@@ -2,7 +2,6 @@
 Common functions for processors.
 """
 
-from __future__ import annotations
 
 # In src/hbb/utils.py
 import pickle

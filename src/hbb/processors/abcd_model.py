@@ -1,14 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-def distance_corr(
-        var_1:torch.tensor,
-        var_2:torch.tensor,
-        normedweight:torch.tensor,
-        power=1,
-        )->torch.tensor:
+def distance_corr(var_1:torch.tensor, var_2:torch.tensor, normedweight:torch.tensor, power=1,) -> torch.tensor:
     
-    # Normalize the weights
+    # Normalize weights
     normedweight = normedweight/torch.sum(normedweight)*len(var_1)
     
     xx = var_1.view(-1, 1).repeat(1, len(var_1)).view(len(var_1),len(var_1))
@@ -129,10 +124,7 @@ class ABCDModel(nn.Module):
         if self.flavor == "single":
             return self.model(x)
 
-        return torch.stack(
-            [self.model[0](x), self.model[1](x)],
-            dim=1
-        )
+        return torch.stack([self.model[0](x), self.model[1](x)], dim=1)
 
     # ---------------- loss ----------------
     def compute_loss(self, batch):
@@ -145,10 +137,7 @@ class ABCDModel(nn.Module):
         # label smoothing
         smoothed_labels = labels.float()
         if self.label_smoothing > 0:
-            smoothed_labels = (
-                smoothed_labels * (1.0 - self.label_smoothing)
-                + 0.5 * self.label_smoothing
-            )
+            smoothed_labels = (smoothed_labels * (1.0 - self.label_smoothing) + 0.5 * self.label_smoothing)
 
         scores = torch.sigmoid(logits)
 
@@ -159,11 +148,7 @@ class ABCDModel(nn.Module):
         bce_components = []
         for h in range(logits.shape[1]):
             bce_components.append(
-                F.binary_cross_entropy_with_logits(
-                    logits[:, h],
-                    smoothed_labels,
-                    weight=safe_weights,
-                )
+                F.binary_cross_entropy_with_logits(logits[:, h], smoothed_labels, weight=safe_weights)
             )
         bce = torch.stack(bce_components).sum()
 
@@ -179,30 +164,13 @@ class ABCDModel(nn.Module):
             bkg_score_0 = bkg_scores[:, 0]
 
             if self.flavor == "single":
-                if (
-                    bkg_score_0.max() - bkg_score_0.min() > 1e-8
-                    and bkg_constraint.max() - bkg_constraint.min() > 1e-8
-                ):
-                    disco_term = distance_corr(
-                        bkg_score_0,
-                        bkg_constraint,
-                        bkg_weights,
-                        power=2,
-                    )
+                if (bkg_score_0.max() - bkg_score_0.min() > 1e-8 and bkg_constraint.max() - bkg_constraint.min() > 1e-8):
+                    disco_term = distance_corr(bkg_score_0, bkg_constraint, bkg_weights, power=2)
             else:
                 bkg_score_1 = bkg_scores[:, 1]
-
-                if (
-                    bkg_score_0.max() - bkg_score_0.min() > 1e-8
-                    and bkg_score_1.max() - bkg_score_1.min() > 1e-8
-                ):
-                    disco_term = distance_corr(
-                        bkg_score_0,
-                        bkg_score_1,
-                        bkg_weights,
-                        power=2,
-                    )
+                if (bkg_score_0.max() - bkg_score_0.min() > 1e-8 and bkg_score_1.max() - bkg_score_1.min() > 1e-8):
+                    disco_term = distance_corr(bkg_score_0, bkg_score_1, bkg_weights, power=2)
 
         total_loss = self.bce_weight * bce + self.disco_lambda * disco_term
-
+        
         return total_loss, bce, disco_term, bce_components

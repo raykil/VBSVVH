@@ -33,3 +33,10 @@ condor/
 *working*
 *test*
 *cache*
+*.tar.gz
+vine-run-info/
+results/
+files_run*_*FJ.json
+samples_run*_*FJ.json
+*_v[0-9]*
+01_processing/submit.sh

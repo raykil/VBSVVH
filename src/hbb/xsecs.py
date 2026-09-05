@@ -2,7 +2,6 @@
 Cross Sections for 13.6 TeV
 """
 
-from __future__ import annotations
 
 BR_WQQ = 0.676
 BR_WLNU = 0.324

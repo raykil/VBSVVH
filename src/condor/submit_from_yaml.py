@@ -4,7 +4,6 @@ Runs the submit script but with samples specified in a yaml file.
 Author(s): Raghav Kansal, Cristina Mantilla Suarez
 """
 
-from __future__ import annotations
 
 import argparse
 from pathlib import Path

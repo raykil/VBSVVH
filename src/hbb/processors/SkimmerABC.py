@@ -3,7 +3,6 @@ Skimmer Base Class - common functions for all skimmers.
 Author(s): Raghav Kansal
 """
 
-from __future__ import annotations
 
 import logging
 from abc import abstractmethod

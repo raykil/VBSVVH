@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 year_map = {
     "2018": ["2018"],
     "2017": ["2017"],

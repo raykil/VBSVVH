@@ -5,7 +5,6 @@ Most corrections retrieved from the cms-nanoAOD repo:
 See https://cms-nanoaod-integration.web.cern.ch/commonJSONSFs/
 """
 
-from __future__ import annotations
 
 import pathlib
 from pathlib import Path

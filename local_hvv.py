@@ -28,8 +28,10 @@ year_tag = {  # sample json metadata.year -> year in run.py
 with open(f"sample_json/samples_run{run}_2L_{nFJ}FJ.json", 'r') as f:
     SAMPLES = json.load(f)
 
+# —————  —————————————————————————
+# Ex) FILE_DICT = {'DYJetsToLL_M-50_UL16': ['root://eosuser.cern.ch///eos/user/r/rband/.../output_0.root']}
 # cahce file (e.g. sample_json/cache_run2_1FJ.json) lets me to look for local copy of file list and skip the time consuming xrdfs.
-cache = Path("sample_json") / f"cache_{args.channel}.json"
+cache = Path(f"sample_json/cache_{args.channel}.json")
 if cache.exists():
     FILE_DICT = {k: v for k, v in json.loads(cache.read_text()).items() if k in SAMPLES}
     print(f"Using cached file list: {cache} ({len(FILE_DICT)}/{len(SAMPLES)} dataset(s) cached)")

@@ -27,7 +27,6 @@ python python/plot_histos.py --year 2022EE 2023 --region signal-all --indir hist
 # To plot the QCD shape comparison
 python python/plot_histos.py --year 2022EE --region signal-all --indir histograms/25Aug27 --outdir plots --plot-type qcd_shape --norm-type density
 """
-from __future__ import annotations
 
 import argparse
 import pickle

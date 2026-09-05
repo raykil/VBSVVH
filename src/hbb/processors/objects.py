@@ -1,4 +1,3 @@
-from __future__ import annotations
 import awkward as ak
 import numpy as np
 from coffea.nanoevents.methods.nanoaod import (ElectronArray, FatJetArray, JetArray, MuonArray, PhotonArray)
@@ -56,7 +55,7 @@ def good_electrons(electrons: ElectronArray):
     )
     return electrons[sel]
 
-def set_ak4jets(jets: JetArray, isRealData: bool, year: str, nano_version: str, event_rho=None):
+def set_ak4jets(jets: JetArray, isRealData: bool, nano_version: str, event_rho=None):
     """
     Jet ID fix for NanoAOD v12 copying
     # https://gitlab.cern.ch/cms-jetmet/coordination/coordination/-/issues/117#note_8880716
@@ -91,7 +90,7 @@ def good_ak4jets(jets: JetArray):
     )
     return jets[sel]
 
-def set_ak8jets(fatjets: FatJetArray, isRealData: bool, year: str, nano_version: str, event_rho=None):
+def set_ak8jets(fatjets: FatJetArray, isRealData: bool, nano_version: str, event_rho=None):
     if "v12" in nano_version:
         fatjets["jetidtight"] = fatjets.isTight
     else:

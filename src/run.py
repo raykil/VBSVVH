@@ -1,29 +1,19 @@
-"""
-Runs a coffea processors on a single file or a set of files (ONLY for testing)
-"""
-
-from __future__ import annotations
-
 import argparse, pickle, shutil, warnings, dask, uproot, yaml
 from pathlib import Path
-
 warnings.filterwarnings("ignore", category=FutureWarning, module="coffea.*")
 warnings.filterwarnings("ignore", category=FutureWarning, message=".*reduce_op.*")
 
 from coffea import nanoevents
 from coffea.dataset_tools import apply_to_fileset, max_chunks, preprocess
-
 from hbb.rdf_schema import RDFSchema
 from hbb.run_utils import get_dataset_spec, get_fileset
 from hbb.xsecs import xsecs
 
 def run(year: str, fileset: dict, args: argparse.Namespace):
-    """Run processor without fancy dask (outputs then need to be accumulated manually)"""
 
     local_dir = Path().resolve()
 
     if args.save_skim or args.save_skim_nosysts:
-        # intermediate files are stored in the "./tmp_parq" local directory
         local_parquet_dir = local_dir / "tmp_parq"
         if local_parquet_dir.is_dir():
             shutil.rmtree(local_parquet_dir)
@@ -49,10 +39,6 @@ def run(year: str, fileset: dict, args: argparse.Namespace):
             schemaclass=nanoevents.NanoAODSchema,
             metadata={"dataset": "test"},
         ).events()
-        # print(events.metadata)
-        # Uncomment the following lines to run the processor directly on the events
-        # out = p.process(events)
-        # (computed,) = dask.compute(out)
     else:
         dict_process_files = get_dataset_spec(fileset)
 
