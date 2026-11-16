@@ -15,5 +15,9 @@ rm -rf $(conda info --base)/envs/vbsvvh-ship # much faster than conda env remove
 ## Submit jobs
 Run
 ```bash
-
+0. Prepare 01_processing/sample_json/samples_run*_*FJ.json.
+1. python get_sample_list.py # creates files_run*_*FJ.json
+2. python run_categorizer.py -c run2_1FJ -y 2016APV -w 75 (see submit.sh for all configs)
 ```
+Inputs to categorizer.py:
+- trained models in `src/hbb/data/run*_2L_*FJ_best_model.pt`

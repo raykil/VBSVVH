@@ -126,7 +126,7 @@ def load_samples(
             # print(list(Path(data_dir / dataset / "parquet").glob(f'{region}*.parquet')))
             # print(f"Columns to load: {columns_to_load}")
 
-            search_path = Path(data_dir / dataset / f"{variation or 'nominal'}_{region}.parq")
+            search_path = Path(data_dir / (variation or "nominal") / dataset / f"{region}.parq")
             # print(f"\n[DEBUG] Script is searching for file: {search_path}\n")
 
             try:

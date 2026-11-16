@@ -4,7 +4,7 @@ from pathlib import Path
 
 scriptPath = Path(__file__).resolve().parent
 parser = ArgumentParser(prog='python get_sample_list.py', epilog="jkil@nd.edu")
-parser.add_argument('-c', '--channels', default=["run2_1FJ"], type=str, nargs='+', choices=['run2_1FJ', 'run2_2FJ', 'run3_1FJ', 'run3_2FJ'])
+parser.add_argument('-c', '--channels', default=["run2_1FJ"], type=str, nargs='+', choices=['run2_1FJ', 'run2_2FJ', 'run3_1FJ', 'run3_2FJ'], help='space-separated.')
 args = parser.parse_args()
 
 DATA_DIR = Path("/groups/cjessop/users/jkil/HVV_2L_RDF") # copy of Reyer's /eos/user/r/rband/HVV2LRDF: condor workers have no CERN identity for eosuser.
@@ -15,7 +15,8 @@ year_tags = {  # sample json metadata.year -> year in run.py
     '2018'        : "2018",
     '2022'        : "2022",
     '2023'        : "2023",
-    '2024Prompt'  : "2024"
+    '2024Prompt'  : "2024",
+    '2025'        : "2025"
 }
 
 for channel in args.channels:

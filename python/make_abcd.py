@@ -83,12 +83,7 @@ def main(args):
     year = args.year
     region = args.region
 
-    MAIN_DIR = "/eos/uscms/store/group/lpchbbrun3/"
-    # dir_name = "lzygala/hvv_26May11/merged_2lep_1FJ_r3_2lep_1FJ_20260506174059/"
-    # dir_name = "lzygala/hvv_26May11/merged_2lep_1FJ_r2_2lep_1FJ_20260506173848/"
-    # dir_name = "lzygala/hvv_26May11/merged_2lep_2FJ_r2_2lep_2FJ_20260608142908/"
-    dir_name = "lzygala/hvv_26May11/merged_2lep_2FJ_r3_2lep_2FJ_20260608143322/"
-    path_to_dir = f"{MAIN_DIR}/{dir_name}/"
+    path_to_dir = Path("/groups/cjessop/users/jkil/260923_VBSVVH_results/results") / args.channel
 
     load_columns = [
         "weight",
@@ -212,6 +207,7 @@ if __name__ == "__main__":
         required=True,
         choices=["2018", "2016", "2016APV", "2017","2022", "2022EE", "2023", "2023BPix", "2024"],
     )
+    parser.add_argument('-c', "--channel", type=str, required=True, choices=["run2_1FJ", "run2_2FJ", "run3_1FJ", "run3_2FJ"])
     parser.add_argument(
         "--region",
         help="region",
